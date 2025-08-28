@@ -1,8 +1,9 @@
+
 import React, { useState, useCallback } from 'react';
 import LoginForm from '../components/LoginForm';
 import QuizQuestion from '../components/QuizQuestion';
 import ResultsScreen from '../components/ResultsScreen';
-import { QuizSession, QuizResult } from '../types/quiz';
+import { QuizSession, QuizResult, Question } from '../types/quiz';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -16,7 +17,7 @@ const Index = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const { toast } = useToast();
 
-  // Fetch questions from Supabase
+  // Fetch questions from Supabase and map to our interface
   const { data: questions = [], isLoading } = useQuery({
     queryKey: ['questions'],
     queryFn: async () => {
@@ -26,7 +27,17 @@ const Index = () => {
         .order('section', { ascending: true });
       
       if (error) throw error;
-      return data;
+      
+      // Map database fields to interface fields
+      return data.map((q): Question => ({
+        id: q.id,
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correct_answer,
+        section: q.section as 1 | 2 | 3,
+        difficulty: q.difficulty as 'easy' | 'moderate' | 'hard',
+        timeLimit: q.time_limit,
+      }));
     }
   });
 
@@ -56,7 +67,7 @@ const Index = () => {
         // Create new user
         const { data: newUser, error } = await supabase
           .from('quiz_users')
-          .insert({ email, access_code, started_at: new Date().toISOString() })
+          .insert({ email, access_code: accessCode, started_at: new Date().toISOString() })
           .select()
           .single();
 
@@ -112,7 +123,7 @@ const Index = () => {
     if (!quizSession || !questions.length) return;
 
     const currentQuestion = questions[currentQuestionIndex];
-    const isCorrect = answerIndex === currentQuestion.correct_answer;
+    const isCorrect = answerIndex === currentQuestion.correctAnswer;
     
     // Update answers array
     const newAnswers = [...quizSession.answers];
@@ -240,9 +251,9 @@ const Index = () => {
 
     toast({
       title: "Quiz Completed!",
-      description: `You scored ${totalScore}/45 questions correctly.`,
+      description: `You scored ${totalScore}/${questions.length} questions correctly.`,
     });
-  }, [toast]);
+  }, [toast, questions.length]);
 
   const handleRestart = useCallback(() => {
     setQuizSession(null);
