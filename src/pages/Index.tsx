@@ -1,11 +1,11 @@
-
 import React, { useState, useCallback } from 'react';
 import LoginForm from '../components/LoginForm';
 import QuizQuestion from '../components/QuizQuestion';
 import ResultsScreen from '../components/ResultsScreen';
 import { QuizSession, QuizResult } from '../types/quiz';
-import { sampleQuestions } from '../data/sampleQuestions';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 type AppState = 'login' | 'quiz' | 'results';
 
@@ -13,42 +13,110 @@ const Index = () => {
   const [appState, setAppState] = useState<AppState>('login');
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
   const [result, setResult] = useState<QuizResult | null>(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const { toast } = useToast();
 
-  const handleLogin = useCallback((email: string, accessCode: string) => {
-    // Initialize quiz session
-    const session: QuizSession = {
-      email,
-      accessCode,
-      currentQuestionIndex: 0,
-      answers: new Array(45).fill(null),
-      startTime: new Date(),
-      sectionScores: {
-        section1: 0,
-        section2: 0,
-        section3: 0,
-      },
-      isCompleted: false,
-    };
+  // Fetch questions from Supabase
+  const { data: questions = [], isLoading } = useQuery({
+    queryKey: ['questions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('questions')
+        .select('*')
+        .order('section', { ascending: true });
+      
+      if (error) throw error;
+      return data;
+    }
+  });
 
-    setQuizSession(session);
-    setAppState('quiz');
-    
-    toast({
-      title: "Quiz Started",
-      description: "Good luck! Take your time and read each question carefully.",
-    });
-  }, [toast]);
+  const handleLogin = useCallback(async (email: string, accessCode: string) => {
+    try {
+      // Check if user exists or create new one
+      const { data: existingUser } = await supabase
+        .from('quiz_users')
+        .select('*')
+        .eq('email', email)
+        .eq('access_code', accessCode)
+        .single();
 
-  const handleAnswer = useCallback((answerIndex: number) => {
-    if (!quizSession) return;
+      let userId;
+      if (existingUser) {
+        if (existingUser.has_completed) {
+          toast({
+            title: "Quiz Already Completed",
+            description: "You have already taken this quiz.",
+            variant: "destructive"
+          });
+          return;
+        }
+        userId = existingUser.id;
+        setCurrentQuestionIndex(existingUser.current_question_index || 0);
+      } else {
+        // Create new user
+        const { data: newUser, error } = await supabase
+          .from('quiz_users')
+          .insert({ email, access_code, started_at: new Date().toISOString() })
+          .select()
+          .single();
 
-    const currentQuestion = sampleQuestions[quizSession.currentQuestionIndex];
-    const isCorrect = answerIndex === currentQuestion.correctAnswer;
+        if (error) throw error;
+        userId = newUser.id;
+        setCurrentQuestionIndex(0);
+      }
+
+      // Create or update session
+      const { error: sessionError } = await supabase
+        .from('quiz_sessions')
+        .upsert({
+          user_id: userId,
+          is_active: true,
+          last_activity: new Date().toISOString()
+        });
+
+      if (sessionError) throw sessionError;
+
+      // Initialize quiz session
+      const session: QuizSession = {
+        email,
+        accessCode,
+        currentQuestionIndex: currentQuestionIndex,
+        answers: new Array(questions.length).fill(null),
+        startTime: new Date(),
+        sectionScores: {
+          section1: 0,
+          section2: 0,
+          section3: 0,
+        },
+        isCompleted: false,
+      };
+
+      setQuizSession(session);
+      setAppState('quiz');
+      
+      toast({
+        title: "Quiz Started",
+        description: "Good luck! Take your time and read each question carefully.",
+      });
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start quiz. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [toast, questions.length, currentQuestionIndex]);
+
+  const handleAnswer = useCallback(async (answerIndex: number) => {
+    if (!quizSession || !questions.length) return;
+
+    const currentQuestion = questions[currentQuestionIndex];
+    const isCorrect = answerIndex === currentQuestion.correct_answer;
     
     // Update answers array
     const newAnswers = [...quizSession.answers];
-    newAnswers[quizSession.currentQuestionIndex] = answerIndex;
+    newAnswers[currentQuestionIndex] = answerIndex;
 
     // Update section scores
     const newSectionScores = { ...quizSession.sectionScores };
@@ -64,13 +132,39 @@ const Index = () => {
       sectionScores: newSectionScores,
     };
 
+    // Update database
+    try {
+      const { data: user } = await supabase
+        .from('quiz_users')
+        .select('id')
+        .eq('email', quizSession.email)
+        .eq('access_code', quizSession.accessCode)
+        .single();
+
+      if (user) {
+        await supabase
+          .from('quiz_users')
+          .update({ current_question_index: currentQuestionIndex + 1 })
+          .eq('id', user.id);
+
+        await supabase
+          .from('quiz_sessions')
+          .update({
+            answers: newAnswers,
+            section_scores: newSectionScores,
+            last_activity: new Date().toISOString()
+          })
+          .eq('user_id', user.id);
+      }
+    } catch (error) {
+      console.error('Error updating progress:', error);
+    }
+
     // Move to next question or finish quiz
     setTimeout(() => {
-      if (quizSession.currentQuestionIndex < sampleQuestions.length - 1) {
-        setQuizSession({
-          ...updatedSession,
-          currentQuestionIndex: quizSession.currentQuestionIndex + 1,
-        });
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+        setQuizSession(updatedSession);
       } else {
         // Quiz completed
         finishQuiz(updatedSession);
@@ -78,14 +172,14 @@ const Index = () => {
     }, 1000);
 
     setQuizSession(updatedSession);
-  }, [quizSession]);
+  }, [quizSession, questions, currentQuestionIndex]);
 
   const handleTimeUp = useCallback(() => {
     // Same as handleAnswer but with no answer selected
     handleAnswer(-1); // -1 indicates no answer
   }, [handleAnswer]);
 
-  const finishQuiz = useCallback((session: QuizSession) => {
+  const finishQuiz = useCallback(async (session: QuizSession) => {
     const endTime = new Date();
     const completionTime = (endTime.getTime() - session.startTime.getTime()) / (1000 * 60); // in minutes
     
@@ -101,6 +195,46 @@ const Index = () => {
       completedAt: endTime,
     };
 
+    try {
+      // Get user ID
+      const { data: user } = await supabase
+        .from('quiz_users')
+        .select('id')
+        .eq('email', session.email)
+        .eq('access_code', session.accessCode)
+        .single();
+
+      if (user) {
+        // Mark as completed
+        await supabase
+          .from('quiz_users')
+          .update({ 
+            has_completed: true, 
+            completed_at: endTime.toISOString() 
+          })
+          .eq('id', user.id);
+
+        // Save result
+        await supabase
+          .from('quiz_results')
+          .insert({
+            user_id: user.id,
+            total_score: totalScore,
+            section_scores: session.sectionScores,
+            completion_time: Math.round(completionTime),
+            completed_at: endTime.toISOString()
+          });
+
+        // Deactivate session
+        await supabase
+          .from('quiz_sessions')
+          .update({ is_active: false })
+          .eq('user_id', user.id);
+      }
+    } catch (error) {
+      console.error('Error saving results:', error);
+    }
+
     setResult(quizResult);
     setAppState('results');
 
@@ -113,8 +247,20 @@ const Index = () => {
   const handleRestart = useCallback(() => {
     setQuizSession(null);
     setResult(null);
+    setCurrentQuestionIndex(0);
     setAppState('login');
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading quiz questions...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Render based on current app state
   switch (appState) {
@@ -122,14 +268,14 @@ const Index = () => {
       return <LoginForm onLogin={handleLogin} />;
       
     case 'quiz':
-      if (!quizSession) return <LoginForm onLogin={handleLogin} />;
+      if (!quizSession || !questions.length) return <LoginForm onLogin={handleLogin} />;
       
-      const currentQuestion = sampleQuestions[quizSession.currentQuestionIndex];
+      const currentQuestion = questions[currentQuestionIndex];
       return (
         <QuizQuestion
           question={currentQuestion}
-          questionNumber={quizSession.currentQuestionIndex + 1}
-          totalQuestions={sampleQuestions.length}
+          questionNumber={currentQuestionIndex + 1}
+          totalQuestions={questions.length}
           onAnswer={handleAnswer}
           onTimeUp={handleTimeUp}
         />

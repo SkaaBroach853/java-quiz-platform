@@ -14,7 +14,151 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      questions: {
+        Row: {
+          correct_answer: number
+          created_at: string
+          difficulty: string
+          id: string
+          image_url: string | null
+          options: string[]
+          question: string
+          section: number
+          time_limit: number
+          updated_at: string
+        }
+        Insert: {
+          correct_answer: number
+          created_at?: string
+          difficulty: string
+          id?: string
+          image_url?: string | null
+          options: string[]
+          question: string
+          section: number
+          time_limit: number
+          updated_at?: string
+        }
+        Update: {
+          correct_answer?: number
+          created_at?: string
+          difficulty?: string
+          id?: string
+          image_url?: string | null
+          options?: string[]
+          question?: string
+          section?: number
+          time_limit?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      quiz_results: {
+        Row: {
+          completed_at: string | null
+          completion_time: number | null
+          id: string
+          section_scores: Json
+          total_score: number
+          user_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          completion_time?: number | null
+          id?: string
+          section_scores: Json
+          total_score: number
+          user_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          completion_time?: number | null
+          id?: string
+          section_scores?: Json
+          total_score?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_results_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_sessions: {
+        Row: {
+          answers: Json | null
+          id: string
+          is_active: boolean | null
+          last_activity: string | null
+          section_scores: Json | null
+          started_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          answers?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_activity?: string | null
+          section_scores?: Json | null
+          started_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          answers?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_activity?: string | null
+          section_scores?: Json | null
+          started_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quiz_users: {
+        Row: {
+          access_code: string
+          completed_at: string | null
+          created_at: string
+          current_question_index: number | null
+          email: string
+          has_completed: boolean | null
+          id: string
+          started_at: string | null
+        }
+        Insert: {
+          access_code: string
+          completed_at?: string | null
+          created_at?: string
+          current_question_index?: number | null
+          email: string
+          has_completed?: boolean | null
+          id?: string
+          started_at?: string | null
+        }
+        Update: {
+          access_code?: string
+          completed_at?: string | null
+          created_at?: string
+          current_question_index?: number | null
+          email?: string
+          has_completed?: boolean | null
+          id?: string
+          started_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
