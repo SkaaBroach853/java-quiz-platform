@@ -1,8 +1,10 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* Definition of the quiz design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
 
@@ -36,23 +38,29 @@ All colors MUST be HSL.
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Quiz-specific design tokens */
+    --quiz-primary: 217.2 91.2% 59.8%; /* Beautiful blue */
+    --quiz-primary-foreground: 0 0% 100%;
+    --quiz-success: 142.1 76.2% 36.3%; /* Success green */
+    --quiz-success-foreground: 0 0% 100%;
+    --quiz-warning: 45.4 93.4% 47.5%; /* Warning amber */
+    --quiz-warning-foreground: 0 0% 100%;
+    --quiz-surface: 0 0% 98%; /* Light surface */
+    --quiz-surface-foreground: 222.2 84% 4.9%;
+    --quiz-border: 214.3 31.8% 91.4%;
+    --quiz-timer: 217.2 91.2% 59.8%;
+    --quiz-timer-bg: 214.3 31.8% 91.4%;
   }
 
   .dark {
@@ -100,6 +108,46 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  /* Quiz-specific component styles */
+  .quiz-card {
+    @apply bg-quiz-surface border border-quiz-border rounded-2xl shadow-sm;
+  }
+  
+  .quiz-button-primary {
+    @apply bg-quiz-primary text-quiz-primary-foreground hover:bg-quiz-primary/90 rounded-xl px-6 py-3 font-medium transition-all duration-200 hover:shadow-md hover:scale-[1.02];
+  }
+  
+  .quiz-button-success {
+    @apply bg-quiz-success text-quiz-success-foreground hover:bg-quiz-success/90 rounded-xl px-6 py-3 font-medium transition-all duration-200 hover:shadow-md hover:scale-[1.02];
+  }
+  
+  .quiz-input {
+    @apply bg-quiz-surface border border-quiz-border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-quiz-primary focus:border-transparent transition-all duration-200;
+  }
+  
+  .option-button {
+    @apply quiz-card p-4 text-left hover:border-quiz-primary hover:bg-quiz-primary/5 transition-all duration-200 cursor-pointer;
+  }
+  
+  .option-button-selected {
+    @apply border-quiz-primary bg-quiz-primary/10;
+  }
+  
+  .timer-circle {
+    @apply text-quiz-timer;
+  }
+  
+  .progress-bar {
+    @apply bg-quiz-timer-bg rounded-full overflow-hidden;
+  }
+  
+  .progress-fill {
+    @apply bg-quiz-primary rounded-full h-full transition-all duration-300 ease-out;
   }
 }
