@@ -71,7 +71,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
       <Card className="quiz-card w-full max-w-md animate-scale-in">
         <CardHeader className="text-center space-y-2">
           <CardTitle className="text-2xl font-semibold text-quiz-primary">
-            Java Quiz Platform
+            QuizPlat
           </CardTitle>
           <p className="text-muted-foreground">
             Enter your credentials to begin the assessment
@@ -136,7 +136,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
           </form>
           
           <div className="mt-6 text-center text-xs text-muted-foreground">
-            <p>Demo Access Codes: QUIZ2024, JAVA101, TEST123</p>
+            <p className="mb-2">Demo Access Codes: QUIZ2024, JAVA101, TEST123</p>
+            <p className="text-quiz-primary font-medium">Created by IOTECH Club</p>
           </div>
         </CardContent>
       </Card>

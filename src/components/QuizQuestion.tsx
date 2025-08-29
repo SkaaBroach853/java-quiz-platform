@@ -77,38 +77,57 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
             </CardTitle>
           </CardHeader>
           
-          <CardContent className="space-y-3">
-            {question.options.map((option, index) => (
-              <button
-                key={index}
-                onClick={() => handleOptionClick(index)}
-                disabled={isAnswered}
-                className={`
-                  option-button w-full text-left
-                  ${selectedAnswer === index ? 'option-button-selected' : ''}
-                  ${isAnswered ? 'cursor-not-allowed opacity-75' : ''}
-                `}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`
-                      w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-medium
-                      ${selectedAnswer === index 
-                        ? 'border-quiz-primary bg-quiz-primary text-white' 
-                        : 'border-quiz-border text-muted-foreground'
-                      }
-                    `}>
-                      {String.fromCharCode(65 + index)}
+          <CardContent className="space-y-4">
+            {/* Display image if it exists */}
+            {question.image_url && (
+              <div className="flex justify-center mb-6">
+                <img 
+                  src={question.image_url} 
+                  alt="Question illustration" 
+                  className="max-w-full h-auto rounded-lg shadow-sm border border-quiz-border"
+                  style={{ maxHeight: '300px' }}
+                  onError={(e) => {
+                    console.error('Failed to load image:', question.image_url);
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            
+            {/* Options */}
+            <div className="space-y-3">
+              {question.options.map((option, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleOptionClick(index)}
+                  disabled={isAnswered}
+                  className={`
+                    option-button w-full text-left
+                    ${selectedAnswer === index ? 'option-button-selected' : ''}
+                    ${isAnswered ? 'cursor-not-allowed opacity-75' : ''}
+                  `}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`
+                        w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-medium
+                        ${selectedAnswer === index 
+                          ? 'border-quiz-primary bg-quiz-primary text-white' 
+                          : 'border-quiz-border text-muted-foreground'
+                        }
+                      `}>
+                        {String.fromCharCode(65 + index)}
+                      </div>
+                      <span className="font-medium">{option}</span>
                     </div>
-                    <span className="font-medium">{option}</span>
+                    
+                    {selectedAnswer === index && (
+                      <CheckCircle size={20} className="text-quiz-primary" />
+                    )}
                   </div>
-                  
-                  {selectedAnswer === index && (
-                    <CheckCircle size={20} className="text-quiz-primary" />
-                  )}
-                </div>
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
           </CardContent>
         </Card>
 

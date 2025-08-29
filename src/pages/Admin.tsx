@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import QuestionManager from '@/components/admin/QuestionManager';
 import LiveTracking from '@/components/admin/LiveTracking';
 import ResultsOverview from '@/components/admin/ResultsOverview';
-import { Users, FileQuestion, BarChart3, Settings } from 'lucide-react';
+import { Users, FileQuestion, BarChart3 } from 'lucide-react';
 
 const Admin = () => {
   return (
@@ -19,7 +19,7 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="questions" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="questions" className="flex items-center gap-2">
               <FileQuestion className="w-4 h-4" />
               Questions
@@ -31,10 +31,6 @@ const Admin = () => {
             <TabsTrigger value="results" className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Results
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="w-4 h-4" />
-              Settings
             </TabsTrigger>
           </TabsList>
 
@@ -76,22 +72,6 @@ const Admin = () => {
               </CardHeader>
               <CardContent>
                 <ResultsOverview />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quiz Settings</CardTitle>
-                <CardDescription>
-                  Configure quiz parameters and access codes
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  Settings panel coming soon...
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
