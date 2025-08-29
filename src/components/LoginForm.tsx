@@ -136,7 +136,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
           </form>
           
           <div className="mt-6 text-center text-xs text-muted-foreground">
-            <p className="mb-2">Designed & Developed by IoTech Technical Lead</p>
+            <p className="mb-2">Designed & Developed by IOTech Technical Lead</p>
             <p className="text-quiz-primary font-medium">An Initiative by IoTech Club – Empowering Students with Technology
 </p>
           </div>
