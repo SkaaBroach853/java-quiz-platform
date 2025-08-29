@@ -4,8 +4,8 @@ import type { Database } from './types';
 
 // const SUPABASE_URL = "https://dwzmmclkjlaluxrskvik.supabase.co";
 // const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3em1tY2xramxhbHV4cnNrdmlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY0MDcwOTksImV4cCI6MjA3MTk4MzA5OX0.0Xt03_tmGetDMNTkk-QYfLgmGVjK4c6lGxWYT4bjzng";
-const SUPABASE_URL = import.meta.env.REACT_APP_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.REACT_APP_SUPABASE_ANON_KEY; // Change this line
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY; // Change this line
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
