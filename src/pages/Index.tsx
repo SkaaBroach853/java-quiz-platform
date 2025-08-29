@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import LoginForm from '../components/LoginForm';
 import QuizQuestion from '../components/QuizQuestion';
@@ -17,7 +16,6 @@ const Index = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const { toast } = useToast();
 
-  // Fetch questions from Supabase and map to our interface
   const { data: questions = [], isLoading } = useQuery({
     queryKey: ['questions'],
     queryFn: async () => {
@@ -251,9 +249,9 @@ const Index = () => {
 
     toast({
       title: "Quiz Completed!",
-      description: `You scored ${totalScore}/${questions.length} questions correctly.`,
+      description: "Thank you for taking the quiz. Your responses have been submitted successfully.",
     });
-  }, [toast, questions.length]);
+  }, [toast]);
 
   const handleRestart = useCallback(() => {
     setQuizSession(null);
