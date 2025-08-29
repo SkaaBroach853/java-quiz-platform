@@ -33,7 +33,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onLogin }) => {
     try {
       // Demo admin credentials - replace with your actual authentication logic
       const validCredentials = [
-        { username: 'admin', password: 'iotech2024' },
+        { username: 'admin', password: 'iotech2025-26' },
         { username: 'iotech', password: 'admin123' }
       ];
       
