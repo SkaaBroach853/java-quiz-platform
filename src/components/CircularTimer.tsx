@@ -6,6 +6,7 @@ interface CircularTimerProps {
   duration: number; // in seconds
   onTimeUp: () => void;
   isActive: boolean;
+  key?: string | number; // Add key prop to force reset
 }
 
 const CircularTimer: React.FC<CircularTimerProps> = ({
@@ -16,6 +17,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
   const [timeLeft, setTimeLeft] = useState(duration);
   const [isWarning, setIsWarning] = useState(false);
 
+  // Reset timer when duration changes or component remounts
   useEffect(() => {
     setTimeLeft(duration);
     setIsWarning(false);

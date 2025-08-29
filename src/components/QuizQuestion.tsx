@@ -25,6 +25,7 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
 
+  // Reset state when question changes
   useEffect(() => {
     setSelectedAnswer(null);
     setIsAnswered(false);
@@ -61,6 +62,7 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
             section={question.section}
           />
           <CircularTimer
+            key={question.id} // Force reset timer for each question
             duration={question.timeLimit}
             onTimeUp={handleTimeUp}
             isActive={!isAnswered}
