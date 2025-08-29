@@ -1,4 +1,3 @@
-
 export interface Question {
   id: string;
   question: string;
@@ -7,6 +6,7 @@ export interface Question {
   section: 1 | 2 | 3;
   difficulty: 'easy' | 'moderate' | 'hard';
   timeLimit: number; // in seconds
+  image_url?: string; // Optional image URL for questions
 }
 
 export interface QuizSession {
