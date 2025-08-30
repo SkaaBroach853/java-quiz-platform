@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import LoginForm from '../components/LoginForm';
 import QuizQuestion from '../components/QuizQuestion';
@@ -47,8 +46,8 @@ const Index = () => {
 
   const handleLogin = useCallback(async (email: string, accessCode: string) => {
     try {
-      // Select a subset of questions for the quiz (e.g., 15 questions)
-      const selectedQuestions = allQuestions.slice(0, 15); // Take first 15 questions
+      // Use all available questions instead of limiting to 15
+      const selectedQuestions = allQuestions;
       setQuizQuestions(selectedQuestions);
 
       // Check if user exists or create new one
@@ -232,7 +231,7 @@ const Index = () => {
           })
           .eq('id', user.id);
 
-        // Save result
+        // Save result with total questions count
         await supabase
           .from('quiz_results')
           .insert({
@@ -240,7 +239,8 @@ const Index = () => {
             total_score: totalScore,
             section_scores: session.sectionScores,
             completion_time: Math.round(completionTime),
-            completed_at: endTime.toISOString()
+            completed_at: endTime.toISOString(),
+            total_questions: quizQuestions.length
           });
 
         // Deactivate session
@@ -260,7 +260,7 @@ const Index = () => {
       title: "Quiz Completed!",
       description: "Thank you for taking the quiz. Your responses have been submitted successfully.",
     });
-  }, [toast]);
+  }, [toast, quizQuestions.length]);
 
   const handleRestart = useCallback(() => {
     setQuizSession(null);

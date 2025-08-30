@@ -1,10 +1,10 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Trophy, Medal, Award, Crown } from 'lucide-react';
+import { useTotalQuestions } from '@/hooks/useTotalQuestions';
 
 interface LeaderboardEntry {
   id: string;
@@ -17,6 +17,9 @@ interface LeaderboardEntry {
 }
 
 const Leaderboard = () => {
+  // Fetch total questions count
+  const { data: totalQuestions = 0 } = useTotalQuestions();
+
   const { data: leaderboard = [], isLoading } = useQuery({
     queryKey: ['leaderboard'],
     queryFn: async () => {
@@ -75,6 +78,9 @@ const Leaderboard = () => {
     }
   };
 
+  // Dynamic pass threshold (67% of total questions)
+  const passThreshold = Math.ceil(totalQuestions * 0.67);
+
   if (isLoading) {
     return <div className="text-center py-8">Loading leaderboard...</div>;
   }
@@ -130,17 +136,17 @@ const Leaderboard = () => {
                 <div className="text-right">
                   <div className="flex items-center gap-2 mb-1">
                     <Badge 
-                      variant={entry.total_score >= 40 ? 'default' : entry.total_score >= 30 ? 'secondary' : 'destructive'}
+                      variant={entry.total_score >= passThreshold ? 'default' : entry.total_score >= Math.ceil(totalQuestions * 0.5) ? 'secondary' : 'destructive'}
                       className="text-lg px-3 py-1"
                     >
-                      {entry.total_score}/45
+                      {entry.total_score}/{totalQuestions}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Time: {entry.completion_time}m
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {Math.round((entry.total_score / 45) * 100)}% accuracy
+                    {Math.round((entry.total_score / totalQuestions) * 100)}% accuracy
                   </p>
                 </div>
               </div>
@@ -161,7 +167,7 @@ const Leaderboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
               <p className="text-2xl font-bold text-yellow-600">
-                {leaderboard[0]?.total_score || 0}
+                {leaderboard[0]?.total_score || 0}/{totalQuestions}
               </p>
               <p className="text-sm text-muted-foreground">Highest Score</p>
             </div>
@@ -170,15 +176,15 @@ const Leaderboard = () => {
                 {leaderboard.length > 0 
                   ? Math.round(leaderboard.reduce((sum, entry) => sum + entry.total_score, 0) / leaderboard.length)
                   : 0
-                }
+                }/{totalQuestions}
               </p>
               <p className="text-sm text-muted-foreground">Average Score</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-green-600">
-                {leaderboard.filter(entry => entry.total_score >= 30).length}
+                {leaderboard.filter(entry => entry.total_score >= passThreshold).length}
               </p>
-              <p className="text-sm text-muted-foreground">Passed (≥30)</p>
+              <p className="text-sm text-muted-foreground">Passed (≥{passThreshold})</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-purple-600">
