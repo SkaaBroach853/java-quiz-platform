@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import LoginForm from '../components/LoginForm';
 import QuizQuestion from '../components/QuizQuestion';
@@ -14,9 +15,10 @@ const Index = () => {
   const [quizSession, setQuizSession] = useState<QuizSession | null>(null);
   const [result, setResult] = useState<QuizResult | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [quizQuestions, setQuizQuestions] = useState<Question[]>([]);
   const { toast } = useToast();
 
-  const { data: questions = [], isLoading } = useQuery({
+  const { data: allQuestions = [], isLoading } = useQuery({
     queryKey: ['questions'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -24,9 +26,12 @@ const Index = () => {
         .select('*')
         .order('section', { ascending: true });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
       
-      // Map database fields to interface fields
+      // Map database fields to interface fields correctly
       return data.map((q): Question => ({
         id: q.id,
         question: q.question,
@@ -35,12 +40,17 @@ const Index = () => {
         section: q.section as 1 | 2 | 3,
         difficulty: q.difficulty as 'easy' | 'moderate' | 'hard',
         timeLimit: q.time_limit,
+        image_url: q.image_url, // Ensure image_url is mapped correctly
       }));
     }
   });
 
   const handleLogin = useCallback(async (email: string, accessCode: string) => {
     try {
+      // Select a subset of questions for the quiz (e.g., 15 questions)
+      const selectedQuestions = allQuestions.slice(0, 15); // Take first 15 questions
+      setQuizQuestions(selectedQuestions);
+
       // Check if user exists or create new one
       const { data: existingUser } = await supabase
         .from('quiz_users')
@@ -90,7 +100,7 @@ const Index = () => {
         email,
         accessCode,
         currentQuestionIndex: currentQuestionIndex,
-        answers: new Array(questions.length).fill(null),
+        answers: new Array(selectedQuestions.length).fill(null),
         startTime: new Date(),
         sectionScores: {
           section1: 0,
@@ -115,12 +125,12 @@ const Index = () => {
         variant: "destructive"
       });
     }
-  }, [toast, questions.length, currentQuestionIndex]);
+  }, [toast, allQuestions, currentQuestionIndex]);
 
   const handleAnswer = useCallback(async (answerIndex: number) => {
-    if (!quizSession || !questions.length) return;
+    if (!quizSession || !quizQuestions.length) return;
 
-    const currentQuestion = questions[currentQuestionIndex];
+    const currentQuestion = quizQuestions[currentQuestionIndex];
     const isCorrect = answerIndex === currentQuestion.correctAnswer;
     
     // Update answers array
@@ -171,7 +181,7 @@ const Index = () => {
 
     // Move to next question or finish quiz
     setTimeout(() => {
-      if (currentQuestionIndex < questions.length - 1) {
+      if (currentQuestionIndex < quizQuestions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
         setQuizSession(updatedSession);
       } else {
@@ -181,10 +191,9 @@ const Index = () => {
     }, 1000);
 
     setQuizSession(updatedSession);
-  }, [quizSession, questions, currentQuestionIndex]);
+  }, [quizSession, quizQuestions, currentQuestionIndex]);
 
   const handleTimeUp = useCallback(() => {
-    // Same as handleAnswer but with no answer selected
     handleAnswer(-1); // -1 indicates no answer
   }, [handleAnswer]);
 
@@ -257,6 +266,7 @@ const Index = () => {
     setQuizSession(null);
     setResult(null);
     setCurrentQuestionIndex(0);
+    setQuizQuestions([]);
     setAppState('login');
   }, []);
 
@@ -277,14 +287,14 @@ const Index = () => {
       return <LoginForm onLogin={handleLogin} />;
       
     case 'quiz':
-      if (!quizSession || !questions.length) return <LoginForm onLogin={handleLogin} />;
+      if (!quizSession || !quizQuestions.length) return <LoginForm onLogin={handleLogin} />;
       
-      const currentQuestion = questions[currentQuestionIndex];
+      const currentQuestion = quizQuestions[currentQuestionIndex];
       return (
         <QuizQuestion
           question={currentQuestion}
           questionNumber={currentQuestionIndex + 1}
-          totalQuestions={questions.length}
+          totalQuestions={quizQuestions.length}
           onAnswer={handleAnswer}
           onTimeUp={handleTimeUp}
         />

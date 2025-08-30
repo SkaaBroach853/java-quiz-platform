@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import QuestionManager from '@/components/admin/QuestionManager';
 import LiveTracking from '@/components/admin/LiveTracking';
 import ResultsOverview from '@/components/admin/ResultsOverview';
+import Leaderboard from '@/components/admin/Leaderboard';
 import AdminAuth from '@/components/AdminAuth';
-import { Users, FileQuestion, BarChart3, LogOut } from 'lucide-react';
+import { Users, FileQuestion, BarChart3, Trophy, LogOut } from 'lucide-react';
 
 const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -54,7 +55,7 @@ const Admin = () => {
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Quiz Admin Dashboard</h1>
+            <h1 className="text-3xl font-bold text-foreground">QuizPlat Admin Dashboard</h1>
             <p className="text-muted-foreground mt-2">
               Welcome back, {adminUser}! Manage questions, track live sessions, and view results
             </p>
@@ -70,7 +71,7 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="questions" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="questions" className="flex items-center gap-2">
               <FileQuestion className="w-4 h-4" />
               Questions
@@ -82,6 +83,10 @@ const Admin = () => {
             <TabsTrigger value="results" className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Results
+            </TabsTrigger>
+            <TabsTrigger value="leaderboard" className="flex items-center gap-2">
+              <Trophy className="w-4 h-4" />
+              Leaderboard
             </TabsTrigger>
           </TabsList>
 
@@ -123,6 +128,20 @@ const Admin = () => {
               </CardHeader>
               <CardContent>
                 <ResultsOverview />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="leaderboard">
+            <Card>
+              <CardHeader>
+                <CardTitle>Leaderboard & Rankings</CardTitle>
+                <CardDescription>
+                  View top performers and detailed rankings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Leaderboard />
               </CardContent>
             </Card>
           </TabsContent>
