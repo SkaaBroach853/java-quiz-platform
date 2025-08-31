@@ -7,8 +7,9 @@ import QuestionManager from '@/components/admin/QuestionManager';
 import LiveTracking from '@/components/admin/LiveTracking';
 import ResultsOverview from '@/components/admin/ResultsOverview';
 import Leaderboard from '@/components/admin/Leaderboard';
+import DataManagement from '@/components/admin/DataManagement';
 import AdminAuth from '@/components/AdminAuth';
-import { Users, FileQuestion, BarChart3, Trophy, LogOut } from 'lucide-react';
+import { Users, FileQuestion, BarChart3, Trophy, Settings, LogOut } from 'lucide-react';
 
 const Admin = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -71,7 +72,7 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="questions" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="questions" className="flex items-center gap-2">
               <FileQuestion className="w-4 h-4" />
               Questions
@@ -87,6 +88,10 @@ const Admin = () => {
             <TabsTrigger value="leaderboard" className="flex items-center gap-2">
               <Trophy className="w-4 h-4" />
               Leaderboard
+            </TabsTrigger>
+            <TabsTrigger value="data-management" className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Data Management
             </TabsTrigger>
           </TabsList>
 
@@ -142,6 +147,20 @@ const Admin = () => {
               </CardHeader>
               <CardContent>
                 <Leaderboard />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="data-management">
+            <Card>
+              <CardHeader>
+                <CardTitle>Data Management</CardTitle>
+                <CardDescription>
+                  Clear live tracking data and quiz results
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DataManagement />
               </CardContent>
             </Card>
           </TabsContent>
