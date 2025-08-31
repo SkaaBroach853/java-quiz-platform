@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -31,6 +30,7 @@ import { Question } from '@/types/quiz';
 import QuizContent from '@/components/QuizContent';
 import { useTotalQuestions } from '@/hooks/useTotalQuestions';
 import AntiCheatProvider from '@/components/AntiCheatProvider';
+import LoginForm from '@/components/LoginForm';
 
 interface QuizUser {
   id: string;
@@ -245,6 +245,12 @@ const Index = () => {
     },
   });
 
+  const handleLogin = (userEmail: string, userAccessCode: string) => {
+    setEmail(userEmail);
+    setAccessCode(userAccessCode);
+    handleStartQuiz();
+  };
+
   const handleStartQuiz = async () => {
     setShowRulesDialog(true);
   };
@@ -366,52 +372,36 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <>
       {!isQuizActive ? (
-        <Card className="max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle className="text-center text-blue-600 text-2xl font-bold">QuizPlat</CardTitle>
-            <CardDescription className="text-center">Enter your details to begin the quiz.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                type="email"
-                id="email"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="accessCode">Access Code</Label>
-              <Input
-                type="text"
-                id="accessCode"
-                placeholder="Enter access code"
-                value={accessCode}
-                onChange={(e) => setAccessCode(e.target.value)}
-              />
-            </div>
-            <Button onClick={handleStartQuiz} disabled={isLoading}>
-              {isLoading ? "Loading..." : "Start Quiz"}
-            </Button>
-          </CardContent>
-        </Card>
+        <LoginForm onLogin={handleLogin} />
       ) : (
-        <AntiCheatProvider>
-          <QuizContent
-            questions={questions}
-            currentQuestionIndex={currentQuestionIndex}
-            answers={answers}
-            onAnswerQuestion={handleAnswerQuestion}
-            onNextQuestion={handleNextQuestion}
-            onPreviousQuestion={handlePreviousQuestion}
-            onSubmitQuiz={handleSubmitQuiz}
-            isLoading={isLoading}
+        <div className="quiz-background-container">
+          {/* Hidden background image that reveals on hover */}
+          <div 
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-0 transition-opacity duration-700 ease-in-out hover:opacity-30 pointer-events-none z-0"
+            style={{
+              backgroundImage: `url('/lovable-uploads/cf3dc97a-7cb9-451d-a212-05b9516b6092.png')`,
+              filter: 'blur(2px) brightness(0.3)'
+            }}
           />
-        </AntiCheatProvider>
+          
+          {/* Quiz content with hover trigger */}
+          <div className="relative z-10 quiz-hover-trigger">
+            <AntiCheatProvider>
+              <QuizContent
+                questions={questions}
+                currentQuestionIndex={currentQuestionIndex}
+                answers={answers}
+                onAnswerQuestion={handleAnswerQuestion}
+                onNextQuestion={handleNextQuestion}
+                onPreviousQuestion={handlePreviousQuestion}
+                onSubmitQuiz={handleSubmitQuiz}
+                isLoading={isLoading}
+              />
+            </AntiCheatProvider>
+          </div>
+        </div>
       )}
 
       <Dialog open={showRulesDialog} onOpenChange={setShowRulesDialog}>
@@ -449,7 +439,7 @@ const Index = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 };
 
