@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Question } from '@/types/quiz';
 import QuizContent from '@/components/QuizContent';
+import { useTotalQuestions } from '@/hooks/useTotalQuestions';
 
 interface QuizUser {
   id: string;
@@ -37,6 +39,7 @@ interface QuizSession {
   is_active: boolean;
   started_at: string;
   last_activity: string;
+  answers?: any;
 }
 
 const Index = () => {
@@ -50,7 +53,8 @@ const Index = () => {
   const [isQuizActive, setIsQuizActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast()
+  const { toast } = useToast();
+  const { data: totalQuestions } = useTotalQuestions();
 
   // Function to update session activity
   const updateSessionActivity = async () => {
@@ -75,21 +79,21 @@ const Index = () => {
 
   // Update activity whenever user answers a question or navigates
   useEffect(() => {
-    if (quizSession && !quizSession.isCompleted) {
+    if (quizSession && quizUser?.has_completed !== true) {
       updateSessionActivity();
     }
   }, [currentQuestionIndex, quizUser?.id]);
 
   // Update activity every 2 minutes while quiz is active
   useEffect(() => {
-    if (quizSession && !quizSession.isCompleted) {
+    if (quizSession && quizUser?.has_completed !== true) {
       const interval = setInterval(() => {
         updateSessionActivity();
       }, 2 * 60 * 1000); // 2 minutes
 
       return () => clearInterval(interval);
     }
-  }, [quizSession?.isCompleted, quizUser?.id]);
+  }, [quizUser?.has_completed, quizUser?.id]);
 
   const fetchQuestions = async () => {
     setIsLoading(true);
@@ -108,8 +112,19 @@ const Index = () => {
           variant: "destructive",
         })
       } else {
-        setQuestions(data as Question[]);
-        setAnswers(Array(data.length).fill(null));
+        // Transform database fields to match Question interface
+        const transformedQuestions: Question[] = (data || []).map(q => ({
+          id: q.id,
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correct_answer,
+          section: q.section as 1 | 2 | 3,
+          difficulty: q.difficulty as 'easy' | 'moderate' | 'hard',
+          timeLimit: q.time_limit,
+          image_url: q.image_url
+        }));
+        setQuestions(transformedQuestions);
+        setAnswers(Array(transformedQuestions.length).fill(null));
       }
     } catch (error) {
       console.error("Unexpected error fetching questions:", error);
@@ -123,15 +138,15 @@ const Index = () => {
     }
   };
 
-  const startQuizMutation = useMutation(
-    async () => {
+  const startQuizMutation = useMutation({
+    mutationFn: async () => {
       setIsLoading(true);
       // Step 1: Check if the user exists
       let { data: existingUser, error: userError } = await supabase
         .from('quiz_users')
         .select('*')
         .eq('email', email)
-        .single();
+        .maybeSingle();
   
       if (userError && userError.code !== 'PGRST116') {
         console.error("Error checking user:", userError);
@@ -166,7 +181,7 @@ const Index = () => {
         .select('*')
         .eq('user_id', userId)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
   
       if (sessionError && sessionError.code !== 'PGRST116') {
         console.error("Error checking session:", sessionError);
@@ -175,7 +190,8 @@ const Index = () => {
   
       if (existingSession) {
         setQuizSession(existingSession);
-        setCurrentQuestionIndex(existingSession.answers?.length || 0);
+        const answersLength = Array.isArray(existingSession.answers) ? existingSession.answers.length : 0;
+        setCurrentQuestionIndex(answersLength);
         setIsQuizActive(true);
         toast({
           title: "Welcome Back",
@@ -202,23 +218,21 @@ const Index = () => {
         })
       }
     },
-    {
-      onSuccess: () => {
-        fetchQuestions();
-      },
-      onError: (error) => {
-        console.error("Mutation error:", error);
-        toast({
-          title: "Error",
-          description: `Failed to start quiz: ${error}`,
-          variant: "destructive",
-        })
-      },
-      onSettled: () => {
-        setIsLoading(false);
-      },
-    }
-  );
+    onSuccess: () => {
+      fetchQuestions();
+    },
+    onError: (error) => {
+      console.error("Mutation error:", error);
+      toast({
+        title: "Error",
+        description: `Failed to start quiz: ${error}`,
+        variant: "destructive",
+      })
+    },
+    onSettled: () => {
+      setIsLoading(false);
+    },
+  });
 
   const handleStartQuiz = async () => {
     startQuizMutation.mutate();
@@ -251,7 +265,7 @@ const Index = () => {
         let score = 0;
         questionsInSection.forEach(question => {
             const questionIndex = questions.findIndex(q => q.id === question.id);
-            if (questionIndex !== -1 && answers[questionIndex] === question.correct_answer) {
+            if (questionIndex !== -1 && answers[questionIndex] === question.correctAnswer) {
                 score++;
             }
         });
@@ -296,7 +310,8 @@ const Index = () => {
             total_score: totalScore,
             section_scores: sectionScores,
             completion_time: completionTime,
-            completed_at: new Date().toISOString()
+            completed_at: new Date().toISOString(),
+            total_questions: totalQuestions || questions.length
           }
         ]);
 
@@ -318,7 +333,7 @@ const Index = () => {
 
       toast({
         title: "Quiz Submitted",
-        description: `Your score: ${totalScore}/${questions.length}`,
+        description: `Your score: ${totalScore}/${totalQuestions || questions.length}`,
       })
       setIsQuizActive(false);
       navigate('/admin');
