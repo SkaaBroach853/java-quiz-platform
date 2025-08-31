@@ -132,6 +132,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           current_question_index: number | null
+          current_session_id: string | null
           email: string
           has_completed: boolean | null
           id: string
@@ -142,6 +143,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           current_question_index?: number | null
+          current_session_id?: string | null
           email: string
           has_completed?: boolean | null
           id?: string
@@ -152,6 +154,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           current_question_index?: number | null
+          current_session_id?: string | null
           email?: string
           has_completed?: boolean | null
           id?: string

@@ -38,7 +38,7 @@ const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({ children }) => {
           has_completed: true, 
           completed_at: new Date().toISOString(),
           elimination_reason: reason 
-        })
+        } as any)
         .eq('id', localStorage.getItem('quiz_user_id'));
 
       if (error) {
@@ -188,7 +188,7 @@ const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({ children }) => {
         // Update session in database
         const { error } = await supabase
           .from('quiz_users')
-          .update({ current_session_id: sessionId })
+          .update({ current_session_id: sessionId } as any)
           .eq('id', userId);
 
         if (error) {
@@ -208,7 +208,7 @@ const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({ children }) => {
             return;
           }
 
-          if (data.current_session_id !== sessionId) {
+          if ((data as any).current_session_id !== sessionId) {
             eliminateUser('Account logged in from another device');
             clearInterval(interval);
           }
