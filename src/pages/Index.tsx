@@ -16,6 +16,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -40,6 +48,7 @@ interface QuizSession {
   started_at: string;
   last_activity: string;
   answers?: any;
+  isCompleted?: boolean;
 }
 
 const Index = () => {
@@ -52,6 +61,7 @@ const Index = () => {
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [isQuizActive, setIsQuizActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showRulesDialog, setShowRulesDialog] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: totalQuestions } = useTotalQuestions();
@@ -235,6 +245,11 @@ const Index = () => {
   });
 
   const handleStartQuiz = async () => {
+    setShowRulesDialog(true);
+  };
+
+  const handleConfirmStart = () => {
+    setShowRulesDialog(false);
     startQuizMutation.mutate();
   };
 
@@ -354,8 +369,8 @@ const Index = () => {
       {!isQuizActive ? (
         <Card className="max-w-md mx-auto">
           <CardHeader>
-            <CardTitle>Start Quiz</CardTitle>
-            <CardDescription>Enter your details to begin the quiz.</CardDescription>
+            <CardTitle className="text-center text-blue-600 text-2xl font-bold">QuizPlat</CardTitle>
+            <CardDescription className="text-center">Enter your details to begin the quiz.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             <div className="grid gap-2">
@@ -395,6 +410,42 @@ const Index = () => {
           isLoading={isLoading}
         />
       )}
+
+      <Dialog open={showRulesDialog} onOpenChange={setShowRulesDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl font-bold">📜 Quiz Rules</DialogTitle>
+          </DialogHeader>
+          <DialogDescription className="space-y-4 text-sm">
+            <p>The quiz has 3 sections with a total of 45 questions.</p>
+            
+            <div className="space-y-2">
+              <p><strong>Section I (15 Questions, Basics)</strong> → Each question has 15 seconds.</p>
+              <p><strong>Section II (15 Questions, Mixed Programming MCQs)</strong> → Each question has 15 seconds.</p>
+              <p><strong>Section III (15 Questions, Only Programming MCQs)</strong> → Each question has 10 seconds.</p>
+            </div>
+
+            <div className="space-y-2">
+              <p>• You cannot skip questions once the timer starts.</p>
+              <p>• Once a section is completed, you cannot return to it.</p>
+              <p>• The timer runs automatically, and unanswered questions will be marked as wrong.</p>
+              <p>• Do not switch browser tabs or minimize the window. If detected, your quiz will be immediately submitted.</p>
+              <p>• Mobile devices are not allowed. Attempt the quiz only on a laptop or desktop.</p>
+              <p>• <strong>If caught cheating, you will be permanently eliminated from the quiz.</strong></p>
+            </div>
+
+            <p className="text-center font-medium">Click below to begin the quiz.</p>
+          </DialogDescription>
+          <DialogFooter className="flex justify-center gap-4">
+            <Button variant="outline" onClick={() => setShowRulesDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmStart} disabled={isLoading}>
+              {isLoading ? "Starting..." : "Begin Quiz"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
