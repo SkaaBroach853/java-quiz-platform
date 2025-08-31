@@ -30,6 +30,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Question } from '@/types/quiz';
 import QuizContent from '@/components/QuizContent';
 import { useTotalQuestions } from '@/hooks/useTotalQuestions';
+import AntiCheatProvider from '@/components/AntiCheatProvider';
 
 interface QuizUser {
   id: string;
@@ -365,7 +366,7 @@ const Index = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
       {!isQuizActive ? (
         <Card className="max-w-md mx-auto">
           <CardHeader>
@@ -399,16 +400,18 @@ const Index = () => {
           </CardContent>
         </Card>
       ) : (
-        <QuizContent
-          questions={questions}
-          currentQuestionIndex={currentQuestionIndex}
-          answers={answers}
-          onAnswerQuestion={handleAnswerQuestion}
-          onNextQuestion={handleNextQuestion}
-          onPreviousQuestion={handlePreviousQuestion}
-          onSubmitQuiz={handleSubmitQuiz}
-          isLoading={isLoading}
-        />
+        <AntiCheatProvider>
+          <QuizContent
+            questions={questions}
+            currentQuestionIndex={currentQuestionIndex}
+            answers={answers}
+            onAnswerQuestion={handleAnswerQuestion}
+            onNextQuestion={handleNextQuestion}
+            onPreviousQuestion={handlePreviousQuestion}
+            onSubmitQuiz={handleSubmitQuiz}
+            isLoading={isLoading}
+          />
+        </AntiCheatProvider>
       )}
 
       <Dialog open={showRulesDialog} onOpenChange={setShowRulesDialog}>
