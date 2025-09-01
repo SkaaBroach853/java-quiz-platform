@@ -25,6 +25,18 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
 
+  // Add safety check for question prop
+  if (!question) {
+    console.error('QuizQuestion: No question provided');
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Loading question...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Reset state when question changes
   useEffect(() => {
     setSelectedAnswer(null);
@@ -57,8 +69,8 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl space-y-8">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl space-y-6">
         {/* Header with progress and timer */}
         <div className="flex justify-between items-start">
           <div className="flex-1">
@@ -79,17 +91,18 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
         </div>
 
         {/* Question Card */}
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-xl font-semibold text-gray-900 leading-relaxed">
-              {question.question}
-            </CardTitle>
-          </CardHeader>
-          
-          <CardContent className="space-y-4">
+        <Card className="bg-white shadow-lg border-0 rounded-2xl">
+          <CardContent className="p-8">
+            {/* Question Title */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 leading-relaxed">
+                {question.question}
+              </h2>
+            </div>
+            
             {/* Display image if it exists */}
             {question.image_url && (
-              <div className="flex justify-center mb-6">
+              <div className="flex justify-center mb-8">
                 <img 
                   src={question.image_url} 
                   alt="Question illustration" 
@@ -104,18 +117,18 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
             )}
             
             {/* Options */}
-            <div className="space-y-3">
+            <div className="space-y-4 mb-8">
               {question.options.map((option, index) => (
                 <button
                   key={index}
                   onClick={() => handleOptionClick(index)}
                   disabled={isAnswered}
                   className={`
-                    w-full text-left p-4 rounded-lg border-2 transition-all duration-200
-                    hover:shadow-md hover:border-blue-300
+                    w-full text-left p-5 rounded-xl border-2 transition-all duration-200
+                    hover:shadow-lg hover:scale-[1.02]
                     ${selectedAnswer === index 
-                      ? 'border-blue-400 bg-blue-50 shadow-md' 
-                      : 'border-gray-200 bg-white hover:bg-gray-50'
+                      ? 'border-blue-500 bg-blue-50 shadow-lg scale-[1.02]' 
+                      : 'border-gray-200 bg-white hover:bg-gray-50 hover:border-blue-300'
                     }
                     ${isAnswered ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}
                   `}
@@ -123,7 +136,7 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className={`
-                        w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-semibold
+                        w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm font-semibold transition-colors
                         ${selectedAnswer === index 
                           ? 'border-blue-500 bg-blue-500 text-white' 
                           : 'border-gray-300 text-gray-600 bg-white'
@@ -131,28 +144,39 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
                       `}>
                         {String.fromCharCode(65 + index)}
                       </div>
-                      <span className="font-medium text-gray-900">{option}</span>
+                      <span className="font-medium text-gray-900 text-lg">{option}</span>
                     </div>
                     
                     {selectedAnswer === index && (
-                      <CheckCircle size={20} className="text-blue-500" />
+                      <CheckCircle size={24} className="text-blue-500" />
                     )}
                   </div>
                 </button>
               ))}
             </div>
+
+            {/* Submit Button */}
+            <div className="flex justify-center">
+              <Button
+                onClick={handleSubmitAnswer}
+                disabled={selectedAnswer === null || isAnswered}
+                className="bg-gray-900 hover:bg-gray-800 text-white px-12 py-4 text-lg font-medium rounded-xl min-w-48 transition-all duration-200 hover:shadow-lg"
+              >
+                {isAnswered ? 'Answer Submitted' : 'Submit Answer'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Submit Button */}
-        <div className="flex justify-center">
-          <Button
-            onClick={handleSubmitAnswer}
-            disabled={selectedAnswer === null || isAnswered}
-            className="bg-gray-900 hover:bg-gray-800 text-white px-8 py-3 text-lg font-medium rounded-lg min-w-48 transition-colors duration-200"
-          >
-            {isAnswered ? 'Answer Submitted' : 'Submit Answer'}
-          </Button>
+        {/* Quiz Started Message */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-start space-x-4">
+            <div className="w-3 h-3 bg-green-500 rounded-full mt-2"></div>
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-1">Quiz Started</h3>
+              <p className="text-gray-600 text-sm">Good luck! Take your time and read each question carefully.</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

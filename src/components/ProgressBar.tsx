@@ -26,24 +26,24 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ current, total, section }) =>
   const sectionInfo = getSectionInfo(section);
 
   return (
-    <div className="w-full max-w-md space-y-3">
-      <div className="flex justify-between items-center text-sm">
-        <span className="text-gray-600 font-medium">
+    <div className="w-full max-w-lg space-y-4">
+      <div className="flex justify-between items-center">
+        <span className="text-gray-700 font-medium text-lg">
           Question {current} of {total}
         </span>
-        <span className={`px-3 py-1 rounded-full text-xs font-medium text-white ${sectionInfo.color}`}>
+        <span className={`px-4 py-2 rounded-full text-sm font-medium text-white ${sectionInfo.color}`}>
           {sectionInfo.name}
         </span>
       </div>
       
-      <div className="w-full bg-gray-200 rounded-full h-3">
+      <div className="w-full bg-gray-200 rounded-full h-2">
         <div
-          className="bg-blue-500 h-3 rounded-full transition-all duration-300 ease-out"
+          className="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
           style={{ width: `${progress}%` }}
         />
       </div>
       
-      <div className="text-center text-xs text-gray-500">
+      <div className="text-center text-sm text-gray-600 font-medium">
         {Math.round(progress)}% Complete
       </div>
     </div>

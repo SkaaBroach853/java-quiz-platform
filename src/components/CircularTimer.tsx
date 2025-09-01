@@ -17,11 +17,14 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
   const [timeLeft, setTimeLeft] = useState(duration);
   const [isWarning, setIsWarning] = useState(false);
 
+  // Add safety check for duration
+  const safeDuration = duration && duration > 0 ? duration : 30; // Default to 30 seconds
+
   // Reset timer when duration changes or component remounts (key changes)
   useEffect(() => {
-    setTimeLeft(duration);
+    setTimeLeft(safeDuration);
     setIsWarning(false);
-  }, [duration]);
+  }, [safeDuration]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -47,15 +50,15 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
     return () => clearInterval(interval);
   }, [isActive, onTimeUp]);
 
-  const progress = (timeLeft / duration) * 100;
+  const progress = (timeLeft / safeDuration) * 100;
   const circumference = 2 * Math.PI * 45; // radius = 45
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
-    <div className="flex flex-col items-center space-y-2">
-      <div className="relative w-24 h-24">
+    <div className="flex flex-col items-center space-y-3">
+      <div className="relative w-28 h-28">
         <svg
-          className="w-24 h-24 transform -rotate-90"
+          className="w-28 h-28 transform -rotate-90"
           viewBox="0 0 100 100"
         >
           {/* Background circle */}
@@ -85,11 +88,11 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
         {/* Timer icon and text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <Clock 
-            size={16} 
+            size={18} 
             className={`mb-1 ${isWarning ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}
           />
           <span 
-            className={`text-lg font-semibold ${
+            className={`text-2xl font-bold ${
               isWarning ? 'text-red-500' : 'text-blue-500'
             }`}
           >
@@ -98,7 +101,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
         </div>
       </div>
       
-      <div className="text-sm text-gray-600 text-center">
+      <div className="text-sm text-gray-600 text-center font-medium">
         {isWarning ? 'Time running out!' : 'Time remaining'}
       </div>
     </div>

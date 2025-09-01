@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -63,6 +62,7 @@ const Index = () => {
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [isQuizActive, setIsQuizActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [questionsLoaded, setQuestionsLoaded] = useState(false);
   const [showRulesDialog, setShowRulesDialog] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -108,6 +108,7 @@ const Index = () => {
   }, [quizUser?.has_completed, quizUser?.id]);
 
   const fetchQuestions = async () => {
+    console.log('Fetching questions...');
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -135,8 +136,10 @@ const Index = () => {
           timeLimit: q.time_limit,
           image_url: q.image_url
         }));
+        console.log('Questions loaded:', transformedQuestions.length);
         setQuestions(transformedQuestions);
         setAnswers(Array(transformedQuestions.length).fill(null));
+        setQuestionsLoaded(true);
       }
     } catch (error) {
       console.error("Unexpected error fetching questions:", error);
@@ -210,7 +213,7 @@ const Index = () => {
         setQuizSession(existingSession);
         const answersLength = Array.isArray(existingSession.answers) ? existingSession.answers.length : 0;
         setCurrentQuestionIndex(answersLength);
-        setIsQuizActive(true);
+        
         toast({
           title: "Welcome Back",
           description: `Resuming your previous session.`,
@@ -229,15 +232,16 @@ const Index = () => {
         }
   
         setQuizSession(newSession);
-        setIsQuizActive(true);
         toast({
           title: "Quiz Started",
           description: `Good luck!`,
         })
       }
     },
-    onSuccess: () => {
-      fetchQuestions();
+    onSuccess: async () => {
+      await fetchQuestions();
+      // Only set quiz as active after questions are loaded
+      setIsQuizActive(true);
     },
     onError: (error) => {
       console.error("Mutation error:", error);
@@ -412,11 +416,23 @@ const Index = () => {
     }
   };
 
+  // Show loading screen while questions are being fetched
+  if (isQuizActive && !questionsLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading quiz questions...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {!isQuizActive ? (
         <LoginForm onLogin={handleLogin} />
-      ) : (
+      ) : questionsLoaded && questions.length > 0 && questions[currentQuestionIndex] ? (
         <AntiCheatProvider>
           <QuizQuestion
             question={questions[currentQuestionIndex]}
@@ -426,6 +442,12 @@ const Index = () => {
             onTimeUp={handleTimeUp}
           />
         </AntiCheatProvider>
+      ) : (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-600">No questions available</p>
+          </div>
+        </div>
       )}
 
       <Dialog open={showRulesDialog} onOpenChange={setShowRulesDialog}>
