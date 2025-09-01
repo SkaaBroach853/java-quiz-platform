@@ -491,8 +491,8 @@ const Index = () => {
             
             <div className="space-y-2">
               <p><strong>Section I (15 Questions, Basics)</strong> → Each question has 15 seconds.</p>
-              <p><strong>Section II (15 Questions, Mixed Programming MCQs)</strong> → Each question has 15 seconds.</p>
-              <p><strong>Section III (15 Questions, Only Programming MCQs)</strong> → Each question has 10 seconds.</p>
+              <p><strong>Section II (15 Questions, Mixed Programming MCQs)</strong> → Each question has 30 seconds.</p>
+              <p><strong>Section III (15 Questions, Only Programming MCQs)</strong> → Each question has 60 seconds.</p>
             </div>
 
             <div className="space-y-2">
