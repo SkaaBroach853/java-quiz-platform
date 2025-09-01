@@ -28,7 +28,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Question } from '@/types/quiz';
-import QuizContent from '@/components/QuizContent';
+import QuizQuestion from '@/components/QuizQuestion';
 import { useTotalQuestions } from '@/hooks/useTotalQuestions';
 import AntiCheatProvider from '@/components/AntiCheatProvider';
 import LoginForm from '@/components/LoginForm';
@@ -168,7 +168,7 @@ const Index = () => {
   
       // If user exists and has completed the quiz, prevent access
       if (existingUser && existingUser.has_completed) {
-        throw new Error("You have already completed this quiz. Multiple attempts are not allowed.");
+        throw new Error("This email has already been used to complete the quiz. Multiple attempts are not allowed.");
       }
   
       let userId;
@@ -279,9 +279,13 @@ const Index = () => {
     }
   };
 
-  const handlePreviousQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
+  const handleTimeUp = () => {
+    // Move to next question automatically when time runs out
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+      // Last question - submit quiz
+      handleSubmitQuiz();
     }
   };
 
@@ -313,21 +317,29 @@ const Index = () => {
   };
 
   const handleSubmitQuiz = async () => {
+    console.log('Starting quiz submission...');
     setIsLoading(true);
+    
     try {
+      if (!quizUser?.id) {
+        throw new Error("No user ID found");
+      }
+
       const sectionScores = calculateSectionScores();
       const totalScore = Object.values(sectionScores).reduce((sum, score) => sum + score, 0);
       const completionTime = 25; // TODO: track real time
+      const questionsCount = totalQuestions || questions.length;
 
-      console.log('Submitting quiz with data:', {
-        user_id: quizUser?.id,
+      console.log('Quiz submission data:', {
+        user_id: quizUser.id,
         total_score: totalScore,
         section_scores: sectionScores,
         completion_time: completionTime,
-        total_questions: totalQuestions || questions.length
+        total_questions: questionsCount
       });
 
-      // Step 1: Update quiz_users table
+      // Step 1: Update quiz_users table first
+      console.log('Updating user completion status...');
       const { error: userUpdateError } = await supabase
         .from('quiz_users')
         .update({ 
@@ -335,24 +347,26 @@ const Index = () => {
           completed_at: new Date().toISOString(),
           current_question_index: questions.length 
         })
-        .eq('id', quizUser?.id);
+        .eq('id', quizUser.id);
 
       if (userUpdateError) {
         console.error("Error updating quiz_users:", userUpdateError);
         throw new Error(`Failed to update user completion status: ${userUpdateError.message}`);
       }
+      console.log('User completion status updated successfully');
 
       // Step 2: Insert into quiz_results table
+      console.log('Inserting quiz results...');
       const { error: resultsError } = await supabase
         .from('quiz_results')
         .insert([
           {
-            user_id: quizUser?.id,
+            user_id: quizUser.id,
             total_score: totalScore,
             section_scores: sectionScores,
             completion_time: completionTime,
             completed_at: new Date().toISOString(),
-            total_questions: totalQuestions || questions.length
+            total_questions: questionsCount
           }
         ]);
 
@@ -360,31 +374,39 @@ const Index = () => {
         console.error("Error inserting quiz_results:", resultsError);
         throw new Error(`Failed to save quiz results: ${resultsError.message}`);
       }
+      console.log('Quiz results inserted successfully');
 
       // Step 3: Update quiz_sessions table
-      const { error: sessionUpdateError } = await supabase
-        .from('quiz_sessions')
-        .update({ is_active: false })
-        .eq('id', quizSession?.id);
+      console.log('Updating session status...');
+      if (quizSession?.id) {
+        const { error: sessionUpdateError } = await supabase
+          .from('quiz_sessions')
+          .update({ is_active: false })
+          .eq('id', quizSession.id);
 
-      if (sessionUpdateError) {
-        console.error("Error updating quiz_sessions:", sessionUpdateError);
-        // Don't throw error here as it's not critical
+        if (sessionUpdateError) {
+          console.error("Error updating quiz_sessions:", sessionUpdateError);
+          // Don't throw error here as it's not critical
+        } else {
+          console.log('Session status updated successfully');
+        }
       }
 
       toast({
         title: "Quiz Submitted Successfully",
-        description: `Your score: ${totalScore}/${totalQuestions || questions.length}`,
-      })
+        description: `Your score: ${totalScore}/${questionsCount}`,
+      });
+      
       setIsQuizActive(false);
       navigate('/admin');
+      
     } catch (error: any) {
-      console.error("Submission error:", error);
+      console.error("Quiz submission error:", error);
       toast({
         title: "Submission Error",
         description: error.message || "Failed to submit quiz. Please try again.",
         variant: "destructive",
-      })
+      });
     } finally {
       setIsLoading(false);
     }
@@ -396,15 +418,12 @@ const Index = () => {
         <LoginForm onLogin={handleLogin} />
       ) : (
         <AntiCheatProvider>
-          <QuizContent
-            questions={questions}
-            currentQuestionIndex={currentQuestionIndex}
-            answers={answers}
-            onAnswerQuestion={handleAnswerQuestion}
-            onNextQuestion={handleNextQuestion}
-            onPreviousQuestion={handlePreviousQuestion}
-            onSubmitQuiz={handleSubmitQuiz}
-            isLoading={isLoading}
+          <QuizQuestion
+            question={questions[currentQuestionIndex]}
+            questionNumber={currentQuestionIndex + 1}
+            totalQuestions={questions.length}
+            onAnswer={handleAnswerQuestion}
+            onTimeUp={handleTimeUp}
           />
         </AntiCheatProvider>
       )}

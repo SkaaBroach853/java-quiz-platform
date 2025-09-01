@@ -17,7 +17,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
   const [timeLeft, setTimeLeft] = useState(duration);
   const [isWarning, setIsWarning] = useState(false);
 
-  // Reset timer when duration changes or component remounts
+  // Reset timer when duration changes or component remounts (key changes)
   useEffect(() => {
     setTimeLeft(duration);
     setIsWarning(false);
@@ -63,7 +63,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
             cx="50"
             cy="50"
             r="45"
-            stroke="hsl(var(--quiz-timer-bg))"
+            stroke="#e5e7eb"
             strokeWidth="6"
             fill="transparent"
           />
@@ -72,7 +72,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
             cx="50"
             cy="50"
             r="45"
-            stroke={isWarning ? "hsl(var(--quiz-warning))" : "hsl(var(--quiz-timer))"}
+            stroke={isWarning ? "#ef4444" : "#3b82f6"}
             strokeWidth="6"
             fill="transparent"
             strokeDasharray={circumference}
@@ -86,11 +86,11 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <Clock 
             size={16} 
-            className={`mb-1 ${isWarning ? 'text-quiz-warning animate-pulse-gentle' : 'timer-circle'}`}
+            className={`mb-1 ${isWarning ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}
           />
           <span 
             className={`text-lg font-semibold ${
-              isWarning ? 'text-quiz-warning' : 'text-quiz-timer'
+              isWarning ? 'text-red-500' : 'text-blue-500'
             }`}
           >
             {timeLeft}
@@ -98,7 +98,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
         </div>
       </div>
       
-      <div className="text-sm text-muted-foreground">
+      <div className="text-sm text-gray-600 text-center">
         {isWarning ? 'Time running out!' : 'Time remaining'}
       </div>
     </div>

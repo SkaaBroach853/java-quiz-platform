@@ -59,6 +59,7 @@ export type Database = {
           completion_time: number | null
           id: string
           section_scores: Json
+          total_questions: number | null
           total_score: number
           user_id: string | null
         }
@@ -67,6 +68,7 @@ export type Database = {
           completion_time?: number | null
           id?: string
           section_scores: Json
+          total_questions?: number | null
           total_score: number
           user_id?: string | null
         }
@@ -75,6 +77,7 @@ export type Database = {
           completion_time?: number | null
           id?: string
           section_scores?: Json
+          total_questions?: number | null
           total_score?: number
           user_id?: string | null
         }

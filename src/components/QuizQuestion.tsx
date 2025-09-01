@@ -41,6 +41,11 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
     if (selectedAnswer !== null && !isAnswered) {
       setIsAnswered(true);
       onAnswer(selectedAnswer);
+      
+      // Auto advance to next question after a short delay
+      setTimeout(() => {
+        onTimeUp(); // This will trigger moving to next question
+      }, 500);
     }
   };
 
@@ -52,27 +57,31 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-quiz-surface to-background p-4">
-      <div className="w-full max-w-4xl space-y-6 animate-fade-in">
+    <div className="min-h-screen bg-white flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl space-y-8">
         {/* Header with progress and timer */}
         <div className="flex justify-between items-start">
-          <ProgressBar
-            current={questionNumber}
-            total={totalQuestions}
-            section={question.section}
-          />
-          <CircularTimer
-            key={question.id} // Force reset timer for each question
-            duration={question.timeLimit}
-            onTimeUp={handleTimeUp}
-            isActive={!isAnswered}
-          />
+          <div className="flex-1">
+            <ProgressBar
+              current={questionNumber}
+              total={totalQuestions}
+              section={question.section}
+            />
+          </div>
+          <div className="ml-8">
+            <CircularTimer
+              key={question.id} // Force reset timer for each question
+              duration={question.timeLimit}
+              onTimeUp={handleTimeUp}
+              isActive={!isAnswered}
+            />
+          </div>
         </div>
 
         {/* Question Card */}
-        <Card className="quiz-card">
-          <CardHeader>
-            <CardTitle className="text-xl font-medium text-quiz-surface-foreground leading-relaxed">
+        <Card className="bg-white shadow-sm border border-gray-200">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-semibold text-gray-900 leading-relaxed">
               {question.question}
             </CardTitle>
           </CardHeader>
@@ -84,7 +93,7 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
                 <img 
                   src={question.image_url} 
                   alt="Question illustration" 
-                  className="max-w-full h-auto rounded-lg shadow-sm border border-quiz-border"
+                  className="max-w-full h-auto rounded-lg shadow-sm border border-gray-200"
                   style={{ maxHeight: '300px' }}
                   onError={(e) => {
                     console.error('Failed to load image:', question.image_url);
@@ -102,27 +111,31 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
                   onClick={() => handleOptionClick(index)}
                   disabled={isAnswered}
                   className={`
-                    option-button w-full text-left
-                    ${selectedAnswer === index ? 'option-button-selected' : ''}
-                    ${isAnswered ? 'cursor-not-allowed opacity-75' : ''}
+                    w-full text-left p-4 rounded-lg border-2 transition-all duration-200
+                    hover:shadow-md hover:border-blue-300
+                    ${selectedAnswer === index 
+                      ? 'border-blue-400 bg-blue-50 shadow-md' 
+                      : 'border-gray-200 bg-white hover:bg-gray-50'
+                    }
+                    ${isAnswered ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'}
                   `}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-4">
                       <div className={`
-                        w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-medium
+                        w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-semibold
                         ${selectedAnswer === index 
-                          ? 'border-quiz-primary bg-quiz-primary text-white' 
-                          : 'border-quiz-border text-muted-foreground'
+                          ? 'border-blue-500 bg-blue-500 text-white' 
+                          : 'border-gray-300 text-gray-600 bg-white'
                         }
                       `}>
                         {String.fromCharCode(65 + index)}
                       </div>
-                      <span className="font-medium">{option}</span>
+                      <span className="font-medium text-gray-900">{option}</span>
                     </div>
                     
                     {selectedAnswer === index && (
-                      <CheckCircle size={20} className="text-quiz-primary" />
+                      <CheckCircle size={20} className="text-blue-500" />
                     )}
                   </div>
                 </button>
@@ -136,7 +149,7 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
           <Button
             onClick={handleSubmitAnswer}
             disabled={selectedAnswer === null || isAnswered}
-            className="quiz-button-primary min-w-40"
+            className="bg-gray-900 hover:bg-gray-800 text-white px-8 py-3 text-lg font-medium rounded-lg min-w-48 transition-colors duration-200"
           >
             {isAnswered ? 'Answer Submitted' : 'Submit Answer'}
           </Button>
