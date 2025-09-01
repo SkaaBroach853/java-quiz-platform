@@ -11,17 +11,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Upload, Edit, Trash2, Image as ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 interface Question {
   id: string;
@@ -60,10 +49,7 @@ const QuestionManager = () => {
         .select('*')
         .order('section', { ascending: true });
       
-      if (error) {
-        console.error('Error fetching questions:', error);
-        throw error;
-      }
+      if (error) throw error;
       return data as Question[];
     }
   });
@@ -82,10 +68,7 @@ const QuestionManager = () => {
           .from('question-images')
           .upload(fileName, selectedImage);
           
-        if (uploadError) {
-          console.error('Image upload error:', uploadError);
-          throw uploadError;
-        }
+        if (uploadError) throw uploadError;
         
         const { data: { publicUrl } } = supabase.storage
           .from('question-images')
@@ -97,37 +80,14 @@ const QuestionManager = () => {
       if (editingQuestion) {
         const { error } = await supabase
           .from('questions')
-          .update({ 
-            question: questionData.question,
-            options: questionData.options,
-            correct_answer: questionData.correct_answer,
-            section: questionData.section,
-            difficulty: questionData.difficulty,
-            time_limit: questionData.time_limit,
-            image_url: imageUrl,
-            updated_at: new Date().toISOString()
-          })
+          .update({ ...questionData, image_url: imageUrl })
           .eq('id', editingQuestion.id);
-        if (error) {
-          console.error('Update error:', error);
-          throw error;
-        }
+        if (error) throw error;
       } else {
         const { error } = await supabase
           .from('questions')
-          .insert({
-            question: questionData.question,
-            options: questionData.options,
-            correct_answer: questionData.correct_answer,
-            section: questionData.section,
-            difficulty: questionData.difficulty,
-            time_limit: questionData.time_limit,
-            image_url: imageUrl
-          });
-        if (error) {
-          console.error('Insert error:', error);
-          throw error;
-        }
+          .insert({ ...questionData, image_url: imageUrl });
+        if (error) throw error;
       }
     },
     onSuccess: () => {
@@ -155,10 +115,7 @@ const QuestionManager = () => {
         .from('questions')
         .delete()
         .eq('id', id);
-      if (error) {
-        console.error('Delete error:', error);
-        throw error;
-      }
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['questions'] });
@@ -166,14 +123,6 @@ const QuestionManager = () => {
         title: "Question Deleted",
         description: "Question has been removed successfully."
       });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to delete question. Please try again.",
-        variant: "destructive"
-      });
-      console.error('Delete error:', error);
     }
   });
 
@@ -204,14 +153,6 @@ const QuestionManager = () => {
     });
     setEditingQuestion(question);
     setIsAddingQuestion(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteMutation.mutateAsync(id);
-    } catch (error) {
-      console.error('Failed to delete question:', error);
-    }
   };
 
   const handleOptionChange = (index: number, value: string) => {
@@ -394,10 +335,6 @@ const QuestionManager = () => {
                         src={question.image_url} 
                         alt="Question" 
                         className="max-w-xs h-auto rounded border"
-                        onError={(e) => {
-                          console.error('Failed to load image:', question.image_url);
-                          e.currentTarget.style.display = 'none';
-                        }}
                       />
                     </div>
                   )}
@@ -420,35 +357,14 @@ const QuestionManager = () => {
                   >
                     <Edit className="w-4 h-4" />
                   </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete the question
-                          and remove it from our servers.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleDelete(question.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => deleteMutation.mutate(question.id)}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
             </CardContent>

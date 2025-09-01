@@ -59,7 +59,6 @@ export type Database = {
           completion_time: number | null
           id: string
           section_scores: Json
-          total_questions: number | null
           total_score: number
           user_id: string | null
         }
@@ -68,7 +67,6 @@ export type Database = {
           completion_time?: number | null
           id?: string
           section_scores: Json
-          total_questions?: number | null
           total_score: number
           user_id?: string | null
         }
@@ -77,7 +75,6 @@ export type Database = {
           completion_time?: number | null
           id?: string
           section_scores?: Json
-          total_questions?: number | null
           total_score?: number
           user_id?: string | null
         }
@@ -135,7 +132,6 @@ export type Database = {
           completed_at: string | null
           created_at: string
           current_question_index: number | null
-          current_session_id: string | null
           email: string
           has_completed: boolean | null
           id: string
@@ -146,7 +142,6 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           current_question_index?: number | null
-          current_session_id?: string | null
           email: string
           has_completed?: boolean | null
           id?: string
@@ -157,7 +152,6 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           current_question_index?: number | null
-          current_session_id?: string | null
           email?: string
           has_completed?: boolean | null
           id?: string
@@ -170,10 +164,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      cleanup_inactive_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
