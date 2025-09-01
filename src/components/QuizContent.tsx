@@ -58,15 +58,7 @@ const QuizContent = ({
   }
 
   return (
-    <div className="min-h-screen p-4 relative z-10">
-      {/* Background overlay that responds to hover */}
-      <div 
-        className="quiz-background-overlay"
-        style={{
-          backgroundImage: `url('/lovable-uploads/cf3dc97a-7cb9-451d-a212-05b9516b6092.png')`,
-        }}
-      />
-      
+    <div className="min-h-screen p-4">
       <Card className="max-w-2xl mx-auto bg-white/95 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>

@@ -150,27 +150,4 @@ All colors MUST be HSL.
   .progress-fill {
     @apply bg-quiz-primary rounded-full h-full transition-all duration-300 ease-out;
   }
-
-  /* Background hover effect for quiz page */
-  .quiz-background-container {
-    @apply relative min-h-screen;
-  }
-
-  .quiz-hover-trigger:hover + .quiz-background-overlay,
-  .quiz-hover-trigger:hover ~ .quiz-background-overlay {
-    @apply opacity-20;
-  }
-
-  .quiz-background-container:hover .quiz-background-overlay {
-    @apply opacity-20;
-  }
-
-  .quiz-background-container .quiz-background-overlay {
-    @apply fixed inset-0 bg-cover bg-center bg-no-repeat opacity-0 transition-opacity duration-700 ease-in-out pointer-events-none z-0;
-    filter: blur(1px) brightness(0.4);
-  }
-
-  .quiz-background-container:hover .quiz-background-overlay {
-    filter: blur(0px) brightness(0.6);
-  }
 }

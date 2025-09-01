@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -152,7 +153,8 @@ const Index = () => {
   const startQuizMutation = useMutation({
     mutationFn: async () => {
       setIsLoading(true);
-      // Step 1: Check if the user exists
+      
+      // Step 1: Check if the user already exists and has completed the quiz
       let { data: existingUser, error: userError } = await supabase
         .from('quiz_users')
         .select('*')
@@ -162,6 +164,11 @@ const Index = () => {
       if (userError && userError.code !== 'PGRST116') {
         console.error("Error checking user:", userError);
         throw new Error("Failed to check user existence.");
+      }
+  
+      // If user exists and has completed the quiz, prevent access
+      if (existingUser && existingUser.has_completed) {
+        throw new Error("You have already completed this quiz. Multiple attempts are not allowed.");
       }
   
       let userId;
@@ -236,7 +243,7 @@ const Index = () => {
       console.error("Mutation error:", error);
       toast({
         title: "Error",
-        description: `Failed to start quiz: ${error}`,
+        description: `${error}`,
         variant: "destructive",
       })
     },
@@ -312,15 +319,27 @@ const Index = () => {
       const totalScore = Object.values(sectionScores).reduce((sum, score) => sum + score, 0);
       const completionTime = 25; // TODO: track real time
 
+      console.log('Submitting quiz with data:', {
+        user_id: quizUser?.id,
+        total_score: totalScore,
+        section_scores: sectionScores,
+        completion_time: completionTime,
+        total_questions: totalQuestions || questions.length
+      });
+
       // Step 1: Update quiz_users table
       const { error: userUpdateError } = await supabase
         .from('quiz_users')
-        .update({ has_completed: true, completed_at: new Date().toISOString() })
+        .update({ 
+          has_completed: true, 
+          completed_at: new Date().toISOString(),
+          current_question_index: questions.length 
+        })
         .eq('id', quizUser?.id);
 
       if (userUpdateError) {
         console.error("Error updating quiz_users:", userUpdateError);
-        throw new Error("Failed to update user completion status.");
+        throw new Error(`Failed to update user completion status: ${userUpdateError.message}`);
       }
 
       // Step 2: Insert into quiz_results table
@@ -339,7 +358,7 @@ const Index = () => {
 
       if (resultsError) {
         console.error("Error inserting quiz_results:", resultsError);
-        throw new Error("Failed to save quiz results.");
+        throw new Error(`Failed to save quiz results: ${resultsError.message}`);
       }
 
       // Step 3: Update quiz_sessions table
@@ -350,20 +369,20 @@ const Index = () => {
 
       if (sessionUpdateError) {
         console.error("Error updating quiz_sessions:", sessionUpdateError);
-        throw new Error("Failed to update session status.");
+        // Don't throw error here as it's not critical
       }
 
       toast({
-        title: "Quiz Submitted",
+        title: "Quiz Submitted Successfully",
         description: `Your score: ${totalScore}/${totalQuestions || questions.length}`,
       })
       setIsQuizActive(false);
       navigate('/admin');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Submission error:", error);
       toast({
         title: "Submission Error",
-        description: `Failed to submit quiz: ${error}`,
+        description: error.message || "Failed to submit quiz. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -376,32 +395,18 @@ const Index = () => {
       {!isQuizActive ? (
         <LoginForm onLogin={handleLogin} />
       ) : (
-        <div className="quiz-background-container">
-          {/* Hidden background image that reveals on hover */}
-          <div 
-            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-0 transition-opacity duration-700 ease-in-out hover:opacity-30 pointer-events-none z-0"
-            style={{
-              backgroundImage: `url('/lovable-uploads/cf3dc97a-7cb9-451d-a212-05b9516b6092.png')`,
-              filter: 'blur(2px) brightness(0.3)'
-            }}
+        <AntiCheatProvider>
+          <QuizContent
+            questions={questions}
+            currentQuestionIndex={currentQuestionIndex}
+            answers={answers}
+            onAnswerQuestion={handleAnswerQuestion}
+            onNextQuestion={handleNextQuestion}
+            onPreviousQuestion={handlePreviousQuestion}
+            onSubmitQuiz={handleSubmitQuiz}
+            isLoading={isLoading}
           />
-          
-          {/* Quiz content with hover trigger */}
-          <div className="relative z-10 quiz-hover-trigger">
-            <AntiCheatProvider>
-              <QuizContent
-                questions={questions}
-                currentQuestionIndex={currentQuestionIndex}
-                answers={answers}
-                onAnswerQuestion={handleAnswerQuestion}
-                onNextQuestion={handleNextQuestion}
-                onPreviousQuestion={handlePreviousQuestion}
-                onSubmitQuiz={handleSubmitQuiz}
-                isLoading={isLoading}
-              />
-            </AntiCheatProvider>
-          </div>
-        </div>
+        </AntiCheatProvider>
       )}
 
       <Dialog open={showRulesDialog} onOpenChange={setShowRulesDialog}>
