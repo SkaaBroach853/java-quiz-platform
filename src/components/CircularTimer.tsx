@@ -17,11 +17,14 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
   const [timeLeft, setTimeLeft] = useState(duration);
   const [isWarning, setIsWarning] = useState(false);
 
-  // Reset timer when duration changes or component remounts
+  // Add safety check for duration
+  const safeDuration = duration && duration > 0 ? duration : 30; // Default to 30 seconds
+
+  // Reset timer when duration changes or component remounts (key changes)
   useEffect(() => {
-    setTimeLeft(duration);
+    setTimeLeft(safeDuration);
     setIsWarning(false);
-  }, [duration]);
+  }, [safeDuration]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -47,15 +50,15 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
     return () => clearInterval(interval);
   }, [isActive, onTimeUp]);
 
-  const progress = (timeLeft / duration) * 100;
+  const progress = (timeLeft / safeDuration) * 100;
   const circumference = 2 * Math.PI * 45; // radius = 45
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
-    <div className="flex flex-col items-center space-y-2">
-      <div className="relative w-24 h-24">
+    <div className="flex flex-col items-center space-y-3">
+      <div className="relative w-28 h-28">
         <svg
-          className="w-24 h-24 transform -rotate-90"
+          className="w-28 h-28 transform -rotate-90"
           viewBox="0 0 100 100"
         >
           {/* Background circle */}
@@ -63,7 +66,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
             cx="50"
             cy="50"
             r="45"
-            stroke="hsl(var(--quiz-timer-bg))"
+            stroke="#e5e7eb"
             strokeWidth="6"
             fill="transparent"
           />
@@ -72,7 +75,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
             cx="50"
             cy="50"
             r="45"
-            stroke={isWarning ? "hsl(var(--quiz-warning))" : "hsl(var(--quiz-timer))"}
+            stroke={isWarning ? "#ef4444" : "#3b82f6"}
             strokeWidth="6"
             fill="transparent"
             strokeDasharray={circumference}
@@ -85,12 +88,12 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
         {/* Timer icon and text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <Clock 
-            size={16} 
-            className={`mb-1 ${isWarning ? 'text-quiz-warning animate-pulse-gentle' : 'timer-circle'}`}
+            size={18} 
+            className={`mb-1 ${isWarning ? 'text-red-500 animate-pulse' : 'text-blue-500'}`}
           />
           <span 
-            className={`text-lg font-semibold ${
-              isWarning ? 'text-quiz-warning' : 'text-quiz-timer'
+            className={`text-2xl font-bold ${
+              isWarning ? 'text-red-500' : 'text-blue-500'
             }`}
           >
             {timeLeft}
@@ -98,7 +101,7 @@ const CircularTimer: React.FC<CircularTimerProps> = ({
         </div>
       </div>
       
-      <div className="text-sm text-muted-foreground">
+      <div className="text-sm text-gray-600 text-center font-medium">
         {isWarning ? 'Time running out!' : 'Time remaining'}
       </div>
     </div>

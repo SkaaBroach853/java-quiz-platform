@@ -28,10 +28,25 @@ interface QuizSession {
 const LiveTracking = () => {
   const [liveUsers, setLiveUsers] = useState<QuizSession[]>([]);
 
+  // Function to cleanup inactive sessions
+  const cleanupInactiveSessions = async () => {
+    try {
+      const { error } = await supabase.rpc('cleanup_inactive_sessions');
+      if (error) {
+        console.error('Error cleaning up inactive sessions:', error);
+      }
+    } catch (error) {
+      console.error('Error calling cleanup function:', error);
+    }
+  };
+
   // Fetch all users and their sessions
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ['quiz-sessions'],
     queryFn: async () => {
+      // First cleanup inactive sessions
+      await cleanupInactiveSessions();
+      
       const { data, error } = await supabase
         .from('quiz_sessions')
         .select(`
@@ -43,7 +58,7 @@ const LiveTracking = () => {
       if (error) throw error;
       return data as QuizSession[];
     },
-    refetchInterval: 5000 // Refresh every 5 seconds
+    refetchInterval: 30000 // Refresh every 30 seconds to cleanup inactive sessions
   });
 
   // Set up real-time subscription
@@ -67,6 +82,15 @@ const LiveTracking = () => {
     return () => {
       supabase.removeChannel(channel);
     };
+  }, []);
+
+  // Cleanup inactive sessions every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      cleanupInactiveSessions();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
   }, []);
 
   const getTimeElapsed = (startTime: string) => {
@@ -178,7 +202,7 @@ const LiveTracking = () => {
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="text-sm font-medium">
-                        Question {(session.quiz_users?.current_question_index || 0) + 1}/45
+                        Question {(session.quiz_users?.current_question_index || 0) + 1}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {session.started_at && getTimeElapsed(session.started_at)} elapsed
