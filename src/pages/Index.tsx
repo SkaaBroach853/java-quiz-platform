@@ -434,7 +434,23 @@ const Index = () => {
 
   // Show result screen after quiz completion
   if (showResultScreen) {
-    return <ResultsScreen />;
+    console.log('Showing results screen');
+    
+    // Simple thank you message without scores
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center bg-white p-8 rounded-lg shadow-lg">
+          <div className="text-6xl mb-4">🎉</div>
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">Thank You!</h2>
+          <p className="text-lg text-gray-600 mb-6">
+            Your quiz has been submitted successfully.
+          </p>
+          <p className="text-sm text-gray-500">
+            We appreciate your participation!
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
