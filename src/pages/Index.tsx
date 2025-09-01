@@ -31,7 +31,7 @@ import QuizQuestion from '@/components/QuizQuestion';
 import { useTotalQuestions } from '@/hooks/useTotalQuestions';
 import AntiCheatProvider from '@/components/AntiCheatProvider';
 import LoginForm from '@/components/LoginForm';
-import ResultScreen from '@/components/ResultScreen'; // Import ResultScreen
+import ResultsScreen from '@/components/ResultsScreen'; // Import ResultsScreen
 
 interface QuizUser {
   id: string;
@@ -434,7 +434,7 @@ const Index = () => {
 
   // Show result screen after quiz completion
   if (showResultScreen) {
-    return <ResultScreen />;
+    return <ResultsScreen />;
   }
 
   return (
