@@ -443,18 +443,17 @@ const Index = () => {
   if (showResultScreen) {
     console.log('Showing results screen');
     
-    // Simple thank you modal/prompt instead of detailed results
+    // Create the result object that ResultsScreen expects
+    // Convert seconds to minutes for the component
+    const result = {
+      completionTime: actualCompletionTime / 60, // Convert seconds to minutes for the formatTime function
+      // Add any other properties that QuizResult type might require
+    };
+    
     return (
       <div className="min-h-screen bg-black bg-opacity-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl max-w-md w-full mx-auto text-center p-8 animate-scale-in">
-          <div className="text-6xl mb-6">🎉</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Quiz Ended</h2>
-          <p className="text-lg text-gray-600 mb-6">
-            Thank you for participating!
-          </p>
-          <div className="text-sm text-gray-500">
-            Your responses have been submitted successfully.
-          </div>
+        <div className="animate-scale-in max-w-2xl w-full">
+          <ResultsScreen result={result} />
         </div>
       </div>
     );
