@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Trophy, Users, Clock, TrendingUp } from 'lucide-react';
 import { useTotalQuestions } from '@/hooks/useTotalQuestions';
 
-interface QuizResult {
+interface QuizResultFromDB {
   id: string;
   user_id: string;
   total_score: number;
@@ -18,6 +18,7 @@ interface QuizResult {
   };
   completion_time: number;
   completed_at: string;
+  total_questions: number;
   quiz_users: {
     email: string;
     access_code: string;
@@ -41,7 +42,16 @@ const ResultsOverview = () => {
         .order('completed_at', { ascending: false });
       
       if (error) throw error;
-      return data as QuizResult[];
+      
+      // Type assertion to properly handle the Json type from Supabase
+      return data.map(result => ({
+        ...result,
+        section_scores: result.section_scores as {
+          section1: number;
+          section2: number;
+          section3: number;
+        }
+      })) as QuizResultFromDB[];
     }
   });
 
