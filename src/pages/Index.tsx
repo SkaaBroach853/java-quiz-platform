@@ -31,6 +31,7 @@ import QuizQuestion from '@/components/QuizQuestion';
 import { useTotalQuestions } from '@/hooks/useTotalQuestions';
 import AntiCheatProvider from '@/components/AntiCheatProvider';
 import LoginForm from '@/components/LoginForm';
+import ResultScreen from '@/components/ResultScreen'; // Import ResultScreen
 
 interface QuizUser {
   id: string;
@@ -64,6 +65,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [questionsLoaded, setQuestionsLoaded] = useState(false);
   const [showRulesDialog, setShowRulesDialog] = useState(false);
+  const [showResultScreen, setShowResultScreen] = useState(false); // Add state for showing result screen
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: totalQuestions } = useTotalQuestions();
@@ -396,13 +398,15 @@ const Index = () => {
         }
       }
 
-      toast({
-        title: "Quiz Submitted Successfully",
-        description: `Your score: ${totalScore}/${questionsCount}`,
-      });
+      // Remove the toast that shows the score
+      // toast({
+      //   title: "Quiz Submitted Successfully",
+      //   description: `Your score: ${totalScore}/${questionsCount}`,
+      // });
       
+      // Instead of navigating to admin, show the result screen
       setIsQuizActive(false);
-      navigate('/admin');
+      setShowResultScreen(true);
       
     } catch (error: any) {
       console.error("Quiz submission error:", error);
@@ -426,6 +430,11 @@ const Index = () => {
         </div>
       </div>
     );
+  }
+
+  // Show result screen after quiz completion
+  if (showResultScreen) {
+    return <ResultScreen />;
   }
 
   return (
