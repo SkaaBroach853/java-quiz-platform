@@ -66,6 +66,8 @@ const Index = () => {
   const [questionsLoaded, setQuestionsLoaded] = useState(false);
   const [showRulesDialog, setShowRulesDialog] = useState(false);
   const [showResultScreen, setShowResultScreen] = useState(false); // Add state for showing result screen
+  const [quizStartTime, setQuizStartTime] = useState<number | null>(null); // Track quiz start time
+  const [actualCompletionTime, setActualCompletionTime] = useState<number>(0); // Track actual completion time in seconds
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: totalQuestions } = useTotalQuestions();
@@ -242,6 +244,8 @@ const Index = () => {
     },
     onSuccess: async () => {
       await fetchQuestions();
+      // Set quiz start time when quiz actually begins
+      setQuizStartTime(Date.now());
       // Only set quiz as active after questions are loaded
       setIsQuizActive(true);
     },
@@ -326,6 +330,10 @@ const Index = () => {
     console.log('Starting quiz submission...');
     setIsLoading(true);
     
+    // Calculate actual completion time
+    const completionTimeInSeconds = quizStartTime ? Math.floor((Date.now() - quizStartTime) / 1000) : 0;
+    setActualCompletionTime(completionTimeInSeconds);
+    
     try {
       if (!quizUser?.id) {
         throw new Error("No user ID found");
@@ -333,14 +341,13 @@ const Index = () => {
 
       const sectionScores = calculateSectionScores();
       const totalScore = Object.values(sectionScores).reduce((sum, score) => sum + score, 0);
-      const completionTime = 25; // TODO: track real time
       const questionsCount = totalQuestions || questions.length;
 
       console.log('Quiz submission data:', {
         user_id: quizUser.id,
         total_score: totalScore,
         section_scores: sectionScores,
-        completion_time: completionTime,
+        completion_time: completionTimeInSeconds, // Use actual time in seconds
         total_questions: questionsCount
       });
 
@@ -370,7 +377,7 @@ const Index = () => {
             user_id: quizUser.id,
             total_score: totalScore,
             section_scores: sectionScores,
-            completion_time: completionTime,
+            completion_time: completionTimeInSeconds, // Use actual time in seconds
             completed_at: new Date().toISOString(),
             total_questions: questionsCount
           }
@@ -437,8 +444,9 @@ const Index = () => {
     console.log('Showing results screen');
     
     // Create the result object that ResultsScreen expects
+    // Convert seconds to minutes for the component
     const result = {
-      completionTime: 25, // You can calculate actual time here if needed
+      completionTime: actualCompletionTime / 60, // Convert seconds to minutes for the formatTime function
       // Add any other properties that QuizResult type might require
     };
     
