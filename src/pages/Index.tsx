@@ -450,13 +450,7 @@ const Index = () => {
       // Add any other properties that QuizResult type might require
     };
     
-    return (
-      <div className="min-h-screen bg-black bg-opacity-50 flex items-center justify-center p-4">
-        <div className="animate-scale-in max-w-2xl w-full">
-          <ResultsScreen result={result} />
-        </div>
-      </div>
-    );
+    return <ResultsScreen result={result} />;
   }
 
   return (
@@ -491,8 +485,8 @@ const Index = () => {
             
             <div className="space-y-2">
               <p><strong>Section I (15 Questions, Basics)</strong> → Each question has 15 seconds.</p>
-              <p><strong>Section II (15 Questions, Mixed Programming MCQs)</strong> → Each question has 30 seconds.</p>
-              <p><strong>Section III (15 Questions, Only Programming MCQs)</strong> → Each question has 60 seconds.</p>
+              <p><strong>Section II (15 Questions, Mixed Programming MCQs)</strong> → Each question has 15 seconds.</p>
+              <p><strong>Section III (15 Questions, Only Programming MCQs)</strong> → Each question has 10 seconds.</p>
             </div>
 
             <div className="space-y-2">
