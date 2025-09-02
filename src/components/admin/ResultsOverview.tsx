@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Trophy, Users, Clock, TrendingUp } from 'lucide-react';
 import { useTotalQuestions } from '@/hooks/useTotalQuestions';
+import { formatTime, minutesToSeconds } from '@/utils/timeFormat';
 
 interface QuizResultFromDB {
   id: string;
@@ -148,7 +150,7 @@ const ResultsOverview = () => {
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-orange-500" />
               <div>
-                <p className="text-2xl font-bold">{averageTime}m</p>
+                <p className="text-2xl font-bold">{formatTime(minutesToSeconds(averageTime))}</p>
                 <p className="text-sm text-muted-foreground">Avg Time</p>
               </div>
             </div>
@@ -234,7 +236,7 @@ const ResultsOverview = () => {
                           S3: {result.section_scores.section3}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {result.completion_time}m completion time
+                          {formatTime(minutesToSeconds(result.completion_time))} completion time
                         </p>
                       </div>
                       

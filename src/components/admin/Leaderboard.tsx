@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -5,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Trophy, Medal, Award, Crown } from 'lucide-react';
 import { useTotalQuestions } from '@/hooks/useTotalQuestions';
+import { formatTime, minutesToSeconds } from '@/utils/timeFormat';
 
 interface LeaderboardEntry {
   id: string;
@@ -143,7 +145,7 @@ const Leaderboard = () => {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Time: {entry.completion_time}m
+                    Time: {formatTime(minutesToSeconds(entry.completion_time))}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {Math.round((entry.total_score / totalQuestions) * 100)}% accuracy
@@ -189,9 +191,9 @@ const Leaderboard = () => {
             <div className="text-center">
               <p className="text-2xl font-bold text-purple-600">
                 {leaderboard.length > 0 
-                  ? Math.round(leaderboard.reduce((sum, entry) => sum + entry.completion_time, 0) / leaderboard.length)
-                  : 0
-                }m
+                  ? formatTime(minutesToSeconds(Math.round(leaderboard.reduce((sum, entry) => sum + entry.completion_time, 0) / leaderboard.length)))
+                  : '0s'
+                }
               </p>
               <p className="text-sm text-muted-foreground">Avg Time</p>
             </div>
