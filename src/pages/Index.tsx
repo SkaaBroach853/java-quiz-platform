@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { useSearchParams } from 'next/navigation';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Question, QuizResult } from '@/types/quiz';
 import QuizQuestion from '@/components/QuizQuestion';
 import ResultsScreen from '@/components/ResultsScreen';
@@ -20,8 +19,8 @@ const Index = () => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [result, setResult] = useState<Omit<QuizResult, 'email'> | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const email = searchParams.get('email');
@@ -31,9 +30,9 @@ const Index = () => {
       setQuizSession({ email, accessCode });
     } else {
       // Redirect to the entry page if email or accessCode is missing
-      router.push('/');
+      navigate('/');
     }
-  }, [router, searchParams]);
+  }, [navigate, searchParams]);
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -80,8 +79,20 @@ const Index = () => {
           return;
         }
 
-        setQuestions(data as Question[]);
-        setAnswers(Array(data.length).fill(null));
+        // Map database response to Question interface
+        const mappedQuestions: Question[] = data.map(q => ({
+          id: q.id,
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correct_answer,
+          section: q.section as 1 | 2 | 3,
+          difficulty: q.difficulty as 'easy' | 'moderate' | 'hard',
+          timeLimit: q.time_limit,
+          image_url: q.image_url
+        }));
+        
+        setQuestions(mappedQuestions);
+        setAnswers(Array(mappedQuestions.length).fill(null));
       } catch (err) {
         console.error("Unexpected error:", err);
         alert("An unexpected error occurred. Please try again.");
