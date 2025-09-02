@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Question, QuizResult } from '@/types/quiz';
 import QuizQuestion from '@/components/QuizQuestion';
 import ResultsScreen from '@/components/ResultsScreen';
+import EntryForm from '@/components/EntryForm';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 
@@ -29,8 +30,8 @@ const Index = () => {
     if (email && accessCode) {
       setQuizSession({ email, accessCode });
     } else {
-      // Redirect to the entry page if email or accessCode is missing
-      navigate('/');
+      // For now, set loading to false to prevent infinite loading
+      setLoading(false);
     }
   }, [navigate, searchParams]);
 
@@ -188,7 +189,7 @@ const Index = () => {
   }
 
   if (!quizSession) {
-    return <div className="min-h-screen bg-gray-100 flex items-center justify-center">Invalid Quiz Session.</div>;
+    return <EntryForm />;
   }
 
   if (!questions || questions.length === 0) {
