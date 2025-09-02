@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 
 interface QuizSession {
+  name: string;
   email: string;
   accessCode: string;
 }
@@ -24,11 +25,12 @@ const Index = () => {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
+    const name = searchParams.get('name');
     const email = searchParams.get('email');
     const accessCode = searchParams.get('accessCode');
 
-    if (email && accessCode) {
-      setQuizSession({ email, accessCode });
+    if (name && email && accessCode) {
+      setQuizSession({ name, email, accessCode });
     } else {
       // For now, set loading to false to prevent infinite loading
       setLoading(false);
@@ -41,12 +43,13 @@ const Index = () => {
 
       try {
         setLoading(true);
+        // Check if user exists
         const { data: existingUser, error: userError } = await supabase
           .from('quiz_users')
           .select('*')
           .eq('email', quizSession.email)
           .eq('access_code', quizSession.accessCode)
-          .single();
+          .maybeSingle(); // Use maybeSingle instead of single to handle no results
   
         if (userError) {
           console.error("Error fetching user:", userError);
@@ -55,10 +58,14 @@ const Index = () => {
         }
   
         if (!existingUser) {
+          // User doesn't exist, create new user
           console.log("User not found, creating new user");
           const { data: newUser, error: newUserError } = await supabase
             .from('quiz_users')
-            .insert([{ email: quizSession.email, access_code: quizSession.accessCode }])
+            .insert([{ 
+              email: quizSession.email, 
+              access_code: quizSession.accessCode
+            }])
             .select()
             .single();
   
