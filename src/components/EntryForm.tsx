@@ -1,23 +1,79 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
+import QuizRulesModal from '@/components/QuizRulesModal';
 import loginBackground from '@/assets/login-background.jpg';
 
 const EntryForm = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [accessCode, setAccessCode] = useState('');
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setCursorPosition({ x: e.clientX, y: e.clientY });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name && email && accessCode) {
-      // Navigate to the quiz with name, email and accessCode as search params
-      navigate(`/?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&accessCode=${encodeURIComponent(accessCode)}`);
+      // Check if email has already been used
+      try {
+        const { data: existingUser, error } = await supabase
+          .from('quiz_users')
+          .select('has_completed')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error checking email:", error);
+          toast({
+            title: "Error",
+            description: "Failed to validate email. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (existingUser && existingUser.has_completed) {
+          toast({
+            title: "Quiz Already Completed",
+            description: "This email has already been used to complete the quiz. You cannot attempt again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // Show rules modal
+        setShowRulesModal(true);
+      } catch (error) {
+        console.error("Unexpected error:", error);
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
+  };
+
+  const handleStartQuiz = () => {
+    setShowRulesModal(false);
+    // Navigate to the quiz with name, email and accessCode as search params
+    navigate(`/?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&accessCode=${encodeURIComponent(accessCode)}`);
   };
 
   return (
@@ -33,11 +89,26 @@ const EntryForm = () => {
       {/* Background overlay that changes opacity on hover */}
       <div className="absolute inset-0 bg-black/80 group-hover:bg-black/20 transition-all duration-700 ease-in-out" />
       
+      {/* Cursor-following glow effect */}
+      <div 
+        className="fixed pointer-events-none z-0 opacity-60"
+        style={{
+          left: cursorPosition.x - 100,
+          top: cursorPosition.y - 100,
+          width: '200px',
+          height: '200px',
+          background: 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.2) 30%, transparent 70%)',
+          borderRadius: '50%',
+          filter: 'blur(20px)',
+          transition: 'left 0.1s ease-out, top 0.1s ease-out'
+        }}
+      />
+      
       {/* Content */}
       <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-blue-600 mb-2">QuizPlat</h1>
-          <p className="text-gray-300 group-hover:text-gray-600 transition-colors duration-700">
+          <p className="text-white font-medium drop-shadow-lg">
             Enter your credentials to begin the assessment
           </p>
         </div>
@@ -122,14 +193,20 @@ const EntryForm = () => {
         </Card>
 
         <div className="text-center mt-8 space-y-2">
-          <p className="text-sm text-gray-400 group-hover:text-gray-600 transition-colors duration-700">
+          <p className="text-sm text-white font-medium drop-shadow-lg">
             Designed & Developed by IOTech Technical Lead
           </p>
-          <p className="text-sm text-blue-400 group-hover:text-blue-600 transition-colors duration-700">
+          <p className="text-sm text-blue-300 font-medium drop-shadow-lg">
             An Initiative by IOTech Club – Empowering Students with Technology
           </p>
         </div>
       </div>
+
+      <QuizRulesModal 
+        isOpen={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+        onStartQuiz={handleStartQuiz}
+      />
     </div>
   );
 };

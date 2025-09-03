@@ -74,6 +74,10 @@ const Index = () => {
             alert("Error creating user. Please try again.");
             return;
           }
+        } else if (existingUser.has_completed) {
+          alert("You have already completed this quiz and cannot attempt it again.");
+          navigate('/');
+          return;
         }
 
         const { data, error } = await supabase
@@ -99,7 +103,23 @@ const Index = () => {
           image_url: q.image_url
         }));
         
-        setQuestions(mappedQuestions);
+        // Shuffle questions within each section
+        const shuffleArray = (array: Question[]) => {
+          const shuffled = [...array];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          return shuffled;
+        };
+
+        const section1Questions = shuffleArray(mappedQuestions.filter(q => q.section === 1));
+        const section2Questions = shuffleArray(mappedQuestions.filter(q => q.section === 2));
+        const section3Questions = shuffleArray(mappedQuestions.filter(q => q.section === 3));
+        
+        const shuffledQuestions = [...section1Questions, ...section2Questions, ...section3Questions];
+        
+        setQuestions(shuffledQuestions);
         setAnswers(Array(mappedQuestions.length).fill(null));
       } catch (err) {
         console.error("Unexpected error:", err);
@@ -168,6 +188,15 @@ const Index = () => {
           console.error("User not found");
           return;
         }
+
+        // Mark user as completed
+        await supabase
+          .from('quiz_users')
+          .update({ 
+            has_completed: true,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
 
         const { error: resultError } = await supabase
           .from('quiz_results')
