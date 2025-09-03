@@ -29,7 +29,7 @@ const Leaderboard = () => {
         .from('quiz_results')
         .select(`
           *,
-          quiz_users (email, access_code)
+          quiz_users!fk_quiz_results_user (email, access_code)
         `)
         .order('total_score', { ascending: false })
         .order('completion_time', { ascending: true });

@@ -158,7 +158,9 @@ const Index = () => {
       }, { section1: 0, section2: 0, section3: 0 });
 
       // Mock completion time (replace with actual calculation)
-      const completionTime = Math.random() * 30; // in minutes
+      const startTime = Date.now() - (30 * 60 * 1000); // Mock start time
+      const currentTime = Date.now();
+      const completionTime = (currentTime - startTime) / (1000 * 60); // in minutes
 
       const quizResult = {
         totalScore: correctAnswers,
@@ -170,8 +172,10 @@ const Index = () => {
       setResult(quizResult);
       setIsCompleted(true);
 
-      // Save result to Supabase
+      // Save result to Supabase with enhanced error handling
       try {
+        console.log("Saving quiz result for:", quizSession?.email);
+        
         const { data: user, error: userError } = await supabase
           .from('quiz_users')
           .select('id')
@@ -180,17 +184,19 @@ const Index = () => {
           .single();
     
         if (userError) {
-          console.error("Error fetching user:", userError);
+          console.error("Error fetching user for result save:", userError);
           return;
         }
     
         if (!user) {
-          console.error("User not found");
+          console.error("User not found for result save");
           return;
         }
 
-        // Mark user as completed
-        await supabase
+        console.log("User found, saving result with user_id:", user.id);
+
+        // Mark user as completed first
+        const { error: updateError } = await supabase
           .from('quiz_users')
           .update({ 
             has_completed: true,
@@ -198,21 +204,31 @@ const Index = () => {
           })
           .eq('id', user.id);
 
-        const { error: resultError } = await supabase
+        if (updateError) {
+          console.error("Error updating user completion status:", updateError);
+        }
+
+        console.log("Inserting quiz result...");
+        const { data: resultData, error: resultError } = await supabase
           .from('quiz_results')
           .insert([
             {
               user_id: user.id,
               total_score: correctAnswers,
               section_scores: sectionScores,
-              completion_time: completionTime,
+              completion_time: Math.round(completionTime * 100) / 100, // Round to 2 decimal places
               completed_at: new Date().toISOString(),
               total_questions: totalQuestions,
             },
-          ]);
+          ])
+          .select()
+          .single();
 
         if (resultError) {
           console.error("Error saving quiz result:", resultError);
+          alert("Error saving quiz result. Please contact support.");
+        } else {
+          console.log("Quiz result saved successfully:", resultData);
         }
       } catch (error) {
         console.error("Unexpected error:", error);
