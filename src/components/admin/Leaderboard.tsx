@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -5,9 +6,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Trophy, Medal, Award, Crown } from 'lucide-react';
 import { useTotalQuestions } from '@/hooks/useTotalQuestions';
+import { formatTime } from '@/utils/timeFormat';
 
 interface LeaderboardEntry {
   id: string;
+  name: string;
   email: string;
   access_code: string;
   total_score: number;
@@ -23,30 +26,48 @@ const Leaderboard = () => {
   const { data: leaderboard = [], isLoading } = useQuery({
     queryKey: ['leaderboard'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get all quiz results
+      const { data: results, error: resultsError } = await supabase
         .from('quiz_results')
-        .select(`
-          *,
-          quiz_users (email, access_code)
-        `)
+        .select('*')
         .order('total_score', { ascending: false })
         .order('completion_time', { ascending: true });
       
-      if (error) {
-        console.error('Error fetching leaderboard:', error);
-        throw error;
+      if (resultsError) {
+        console.error('Error fetching quiz results:', resultsError);
+        throw resultsError;
       }
 
-      // Add ranking to the results
-      const rankedResults = data.map((result, index): LeaderboardEntry => ({
-        id: result.id,
-        email: result.quiz_users?.email || 'Unknown',
-        access_code: result.quiz_users?.access_code || 'N/A',
-        total_score: result.total_score,
-        completion_time: result.completion_time || 0,
-        completed_at: result.completed_at,
-        rank: index + 1
-      }));
+      if (!results || results.length === 0) {
+        return [];
+      }
+
+      // Then get user data for each result
+      const userIds = results.map(result => result.user_id).filter(Boolean);
+      const { data: users, error: usersError } = await supabase
+        .from('quiz_users')
+        .select('id, name, email, access_code')
+        .in('id', userIds);
+
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+        throw usersError;
+      }
+
+      // Combine the data
+      const rankedResults = results.map((result, index): LeaderboardEntry => {
+        const user = users?.find(u => u.id === result.user_id);
+        return {
+          id: result.id,
+          name: user?.name || 'No Name',
+          email: user?.email || 'Unknown',
+          access_code: user?.access_code || 'N/A',
+          total_score: result.total_score,
+          completion_time: result.completion_time || 0,
+          completed_at: result.completed_at,
+          rank: index + 1
+        };
+      });
 
       return rankedResults;
     }
@@ -123,7 +144,8 @@ const Leaderboard = () => {
                   </div>
                   
                   <div>
-                    <h3 className="font-semibold text-lg">{entry.email}</h3>
+                    <h3 className="font-semibold text-lg">{entry.name}</h3>
+                    <p className="text-sm text-muted-foreground">{entry.email}</p>
                     <p className="text-sm text-muted-foreground">
                       Access Code: {entry.access_code}
                     </p>
@@ -143,7 +165,7 @@ const Leaderboard = () => {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Time: {entry.completion_time}m
+                    Time: {formatTime(entry.completion_time)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {Math.round((entry.total_score / totalQuestions) * 100)}% accuracy
@@ -189,9 +211,9 @@ const Leaderboard = () => {
             <div className="text-center">
               <p className="text-2xl font-bold text-purple-600">
                 {leaderboard.length > 0 
-                  ? Math.round(leaderboard.reduce((sum, entry) => sum + entry.completion_time, 0) / leaderboard.length)
-                  : 0
-                }m
+                  ? formatTime(Math.round(leaderboard.reduce((sum, entry) => sum + entry.completion_time, 0) / leaderboard.length))
+                  : '0s'
+                }
               </p>
               <p className="text-sm text-muted-foreground">Avg Time</p>
             </div>

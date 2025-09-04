@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      backups: {
+        Row: {
+          backup_data: Json
+          backup_name: string
+          backup_size: number | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+        }
+        Insert: {
+          backup_data: Json
+          backup_name: string
+          backup_size?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+        }
+        Update: {
+          backup_data?: Json
+          backup_name?: string
+          backup_size?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      cheating_logs: {
+        Row: {
+          event_description: string | null
+          event_type: string
+          id: string
+          question_number: number | null
+          session_id: string | null
+          timestamp: string
+          user_agent: string | null
+          user_email: string
+          user_id: string
+        }
+        Insert: {
+          event_description?: string | null
+          event_type: string
+          id?: string
+          question_number?: number | null
+          session_id?: string | null
+          timestamp?: string
+          user_agent?: string | null
+          user_email: string
+          user_id: string
+        }
+        Update: {
+          event_description?: string | null
+          event_type?: string
+          id?: string
+          question_number?: number | null
+          session_id?: string | null
+          timestamp?: string
+          user_agent?: string | null
+          user_email?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cheating_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       questions: {
         Row: {
           correct_answer: number
@@ -83,6 +154,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_quiz_results_user"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "quiz_results_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -121,6 +199,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_quiz_sessions_user"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_users"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "quiz_sessions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -139,6 +224,7 @@ export type Database = {
           email: string
           has_completed: boolean | null
           id: string
+          name: string | null
           started_at: string | null
         }
         Insert: {
@@ -150,6 +236,7 @@ export type Database = {
           email: string
           has_completed?: boolean | null
           id?: string
+          name?: string | null
           started_at?: string | null
         }
         Update: {
@@ -161,6 +248,7 @@ export type Database = {
           email?: string
           has_completed?: boolean | null
           id?: string
+          name?: string | null
           started_at?: string | null
         }
         Relationships: []
