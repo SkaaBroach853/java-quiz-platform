@@ -31,7 +31,7 @@ const DataManagement = () => {
         .from('quiz_sessions')
         .select(`
           *,
-          quiz_users!fk_quiz_sessions_user (email, access_code)
+          quiz_users (email, access_code)
         `)
         .eq('is_active', true);
       
@@ -48,7 +48,7 @@ const DataManagement = () => {
         .from('quiz_results')
         .select(`
           *,
-          quiz_users!fk_quiz_results_user (email, access_code)
+          quiz_users (email, access_code)
         `)
         .order('completed_at', { ascending: false });
       

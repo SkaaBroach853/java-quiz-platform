@@ -54,7 +54,7 @@ export const sampleQuestions: Question[] = [
     timeLimit: 15
   },
   
-  // Section 2: Moderate Questions (15 seconds each)
+  // Section 2: Moderate Questions (30 seconds each)
   {
     id: '16',
     question: 'What is method overloading in Java?',
@@ -67,7 +67,7 @@ export const sampleQuestions: Question[] = [
     correctAnswer: 0,
     section: 2,
     difficulty: 'moderate',
-    timeLimit: 15
+    timeLimit: 30
   },
   {
     id: '17',
@@ -76,7 +76,7 @@ export const sampleQuestions: Question[] = [
     correctAnswer: 2,
     section: 2,
     difficulty: 'moderate',
-    timeLimit: 15
+    timeLimit: 30
   },
   {
     id: '18',
@@ -90,10 +90,10 @@ export const sampleQuestions: Question[] = [
     correctAnswer: 0,
     section: 2,
     difficulty: 'moderate',
-    timeLimit: 15
+    timeLimit: 30
   },
   
-  // Section 3: Hard Questions (10 seconds each)
+  // Section 3: Hard Questions (60 seconds each)
   {
     id: '31',
     question: 'What happens when you call wait() method on an object?',
@@ -106,7 +106,7 @@ export const sampleQuestions: Question[] = [
     correctAnswer: 1,
     section: 3,
     difficulty: 'hard',
-    timeLimit: 10
+    timeLimit: 60
   },
   {
     id: '32',
@@ -115,7 +115,7 @@ export const sampleQuestions: Question[] = [
     correctAnswer: 2,
     section: 3,
     difficulty: 'hard',
-    timeLimit: 10
+    timeLimit: 60
   },
   
   // Add more questions to reach 15 per section (shortened for demo)
@@ -135,7 +135,7 @@ export const sampleQuestions: Question[] = [
     correctAnswer: 1,
     section: 2 as const,
     difficulty: 'moderate' as const,
-    timeLimit: 15
+    timeLimit: 30
   })),
   ...Array.from({ length: 13 }, (_, i) => ({
     id: `${33 + i}`,
@@ -144,6 +144,6 @@ export const sampleQuestions: Question[] = [
     correctAnswer: 2,
     section: 3 as const,
     difficulty: 'hard' as const,
-    timeLimit: 10
+    timeLimit: 60
   }))
 ];

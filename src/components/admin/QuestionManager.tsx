@@ -335,9 +335,7 @@ const QuestionManager = () => {
                   <SelectContent>
                     <SelectItem value="15">15 seconds</SelectItem>
                     <SelectItem value="30">30 seconds</SelectItem>
-                    <SelectItem value="45">45 seconds</SelectItem>
                     <SelectItem value="60">60 seconds</SelectItem>
-                    <SelectItem value="0">No time limit</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -387,7 +385,7 @@ const QuestionManager = () => {
                   <div className="flex items-center gap-2 mb-2">
                     <Badge variant="outline">Section {question.section}</Badge>
                     <Badge variant="secondary">{question.difficulty}</Badge>
-                    <Badge variant="outline">{question.time_limit === 0 ? 'No limit' : `${question.time_limit}s`}</Badge>
+                    <Badge variant="outline">{question.time_limit}s</Badge>
                   </div>
                   <h4 className="font-medium mb-2">{question.question}</h4>
                   {question.image_url && (

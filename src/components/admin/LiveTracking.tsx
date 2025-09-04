@@ -51,7 +51,7 @@ const LiveTracking = () => {
         .from('quiz_sessions')
         .select(`
           *,
-          quiz_users!fk_quiz_sessions_user (*)
+          quiz_users (*)
         `)
         .order('started_at', { ascending: false });
       

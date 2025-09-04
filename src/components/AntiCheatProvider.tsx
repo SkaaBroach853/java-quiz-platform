@@ -1,97 +1,127 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+import React, { useEffect, useState, useRef } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-
-interface AntiCheatContextType {
-  isActive: boolean;
-  setIsActive: (active: boolean) => void;
-  logCheatingEvent: (eventType: string, description: string, questionNumber?: number) => void;
-}
-
-const AntiCheatContext = createContext<AntiCheatContextType | null>(null);
-
-export const useAntiCheat = () => {
-  const context = useContext(AntiCheatContext);
-  if (!context) {
-    throw new Error('useAntiCheat must be used within AntiCheatProvider');
-  }
-  return context;
-};
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface AntiCheatProviderProps {
-  children: ReactNode;
-  userEmail: string;
-  userId: string;
-  currentQuestionNumber?: number;
-  onAutoSubmit: () => void;
+  children: React.ReactNode;
 }
 
-export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
-  children,
-  userEmail,
-  userId,
-  currentQuestionNumber = 1,
-  onAutoSubmit,
-}) => {
-  const [isActive, setIsActive] = useState(false);
-  const [tabSwitchWarnings, setTabSwitchWarnings] = useState(0);
+const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({ children }) => {
+  const [warnings, setWarnings] = useState(0);
+  const [fullscreenWarnings, setFullscreenWarnings] = useState(0);
   const [showWarningDialog, setShowWarningDialog] = useState(false);
-  const [showCheatingDialog, setShowCheatingDialog] = useState(false);
-  const [multipleScreenWarnings, setMultipleScreenWarnings] = useState(0);
+  const [warningMessage, setWarningMessage] = useState('');
+  const [isEliminated, setIsEliminated] = useState(false);
+  const { toast } = useToast();
+  const tabSwitchCount = useRef(0);
+  const fullscreenExitCount = useRef(0);
 
-  const logCheatingEvent = async (eventType: string, description: string, questionNumber?: number) => {
+  // Function to eliminate user from quiz
+  const eliminateUser = async (reason: string) => {
+    setIsEliminated(true);
+    
     try {
-      await supabase.from('cheating_logs').insert({
-        user_id: userId,
-        user_email: userEmail,
-        event_type: eventType,
-        event_description: description,
-        question_number: questionNumber || currentQuestionNumber,
-        user_agent: navigator.userAgent,
-        session_id: `${userEmail}_${Date.now()}`
-      });
+      // Update user status in database
+      const { error } = await supabase
+        .from('quiz_users')
+        .update({ 
+          has_completed: true, 
+          completed_at: new Date().toISOString(),
+          elimination_reason: reason 
+        } as any)
+        .eq('id', localStorage.getItem('quiz_user_id'));
+
+      if (error) {
+        console.error('Error updating elimination status:', error);
+      }
     } catch (error) {
-      console.error('Failed to log cheating event:', error);
+      console.error('Error eliminating user:', error);
     }
-  };
 
-  const handleAutoSubmit = (reason: string) => {
-    setShowCheatingDialog(true);
-    logCheatingEvent('auto_submit', reason, currentQuestionNumber);
+    toast({
+      title: "Quiz Ended",
+      description: `You have been eliminated: ${reason}`,
+      variant: "destructive",
+    });
+
+    // Redirect to home after 3 seconds
     setTimeout(() => {
-      onAutoSubmit();
-    }, 3000); // Give user 3 seconds to see the warning before auto-submit
+      window.location.href = '/';
+    }, 3000);
   };
 
-  // Tab switching / Window blur detection
+  // Disable right-click context menu
   useEffect(() => {
-    if (!isActive) return;
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
 
+    document.addEventListener('contextmenu', handleContextMenu);
+    return () => document.removeEventListener('contextmenu', handleContextMenu);
+  }, []);
+
+  // Disable copy/paste and other keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Disable common shortcuts
+      if (
+        (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a' || e.key === 's' || e.key === 'p')) ||
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) ||
+        e.key === 'F12' ||
+        (e.ctrlKey && e.key === 'u') ||
+        (e.ctrlKey && e.shiftKey && e.key === 'Delete')
+      ) {
+        e.preventDefault();
+        toast({
+          title: "Action Blocked",
+          description: "This action is not allowed during the quiz.",
+          variant: "destructive",
+        });
+        return false;
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [toast]);
+
+  // Handle tab switching and window focus
+  useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        if (tabSwitchWarnings === 0) {
-          setTabSwitchWarnings(1);
+        tabSwitchCount.current += 1;
+        
+        if (tabSwitchCount.current === 1) {
+          setWarningMessage('Warning: Tab switching detected. You have 1 warning remaining.');
           setShowWarningDialog(true);
-          logCheatingEvent('tab_switch_warning', 'User switched tabs - first warning', currentQuestionNumber);
-          toast({
-            title: "⚠️ Warning",
-            description: "You switched tabs or tried to leave. One more attempt will auto-submit your quiz.",
-            variant: "destructive",
-          });
-        } else {
-          handleAutoSubmit('User switched tabs after warning');
+        } else if (tabSwitchCount.current >= 2) {
+          eliminateUser('Multiple tab switches detected');
         }
       }
     };
 
     const handleBlur = () => {
-      if (tabSwitchWarnings === 0) {
-        setTabSwitchWarnings(1);
-        setShowWarningDialog(true);
-        logCheatingEvent('window_blur_warning', 'User minimized or lost focus - first warning', currentQuestionNumber);
-      } else {
-        handleAutoSubmit('User lost window focus after warning');
+      if (!document.hidden) {
+        // Window minimized
+        tabSwitchCount.current += 1;
+        
+        if (tabSwitchCount.current === 1) {
+          setWarningMessage('Warning: Window minimization detected. You have 1 warning remaining.');
+          setShowWarningDialog(true);
+        } else if (tabSwitchCount.current >= 2) {
+          eliminateUser('Multiple window focus changes detected');
+        }
       }
     };
 
@@ -102,122 +132,119 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleBlur);
     };
-  }, [isActive, tabSwitchWarnings, currentQuestionNumber]);
+  }, []);
 
-  // Multiple screen detection
+  // Force fullscreen mode
   useEffect(() => {
-    if (!isActive) return;
+    const enterFullscreen = async () => {
+      try {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
+      } catch (error) {
+        console.error('Error entering fullscreen:', error);
+        toast({
+          title: "Fullscreen Required",
+          description: "Please enable fullscreen mode to continue the quiz.",
+          variant: "destructive",
+        });
+      }
+    };
 
-    const checkScreens = () => {
-      if (screen.availWidth !== window.screen.width || screen.availHeight !== window.screen.height) {
-        if (multipleScreenWarnings === 0) {
-          setMultipleScreenWarnings(1);
-          logCheatingEvent('multiple_screens_warning', 'Multiple screens detected - first warning', currentQuestionNumber);
-          toast({
-            title: "⚠️ Multiple Screens Detected",
-            description: "Multiple display setup detected. One more violation will auto-submit your quiz.",
-            variant: "destructive",
-          });
-        } else {
-          handleAutoSubmit('Multiple screens detected after warning');
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        fullscreenExitCount.current += 1;
+        
+        if (fullscreenExitCount.current === 1) {
+          setWarningMessage('Warning: You exited fullscreen mode. You have 1 warning remaining.');
+          setShowWarningDialog(true);
+          // Try to re-enter fullscreen
+          enterFullscreen();
+        } else if (fullscreenExitCount.current >= 2) {
+          eliminateUser('Exited fullscreen mode multiple times');
         }
       }
     };
 
-    // Check periodically
-    const interval = setInterval(checkScreens, 5000);
-    return () => clearInterval(interval);
-  }, [isActive, multipleScreenWarnings, currentQuestionNumber]);
+    // Enter fullscreen on component mount
+    enterFullscreen();
 
-  // Disable right-click, copy-paste, text selection, keyboard shortcuts
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [toast]);
+
+  // Single login enforcement
   useEffect(() => {
-    if (!isActive) return;
+    const userId = localStorage.getItem('quiz_user_id');
+    if (!userId) return;
 
-    // Disable right-click
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-      logCheatingEvent('right_click', 'User attempted right-click', currentQuestionNumber);
-      toast({
-        title: "❌ Action Blocked",
-        description: "Right-click is disabled during the quiz.",
-        variant: "destructive",
-      });
-    };
+    const checkSingleLogin = async () => {
+      try {
+        const sessionId = Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('session_id', sessionId);
 
-    // Disable text selection
-    const handleSelectStart = (e: Event) => {
-      e.preventDefault();
-      return false;
-    };
+        // Update session in database
+        const { error } = await supabase
+          .from('quiz_users')
+          .update({ current_session_id: sessionId } as any)
+          .eq('id', userId);
 
-    // Disable keyboard shortcuts
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Disable common shortcuts
-      if (
-        (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a' || e.key === 's' || e.key === 'p')) ||
-        (e.ctrlKey && e.shiftKey && e.key === 'I') ||
-        e.key === 'F12' ||
-        (e.ctrlKey && e.shiftKey && e.key === 'C') ||
-        (e.ctrlKey && e.key === 'u') ||
-        (e.altKey && e.key === 'Tab')
-      ) {
-        e.preventDefault();
-        logCheatingEvent('keyboard_shortcut', `User attempted: ${e.ctrlKey ? 'Ctrl+' : ''}${e.shiftKey ? 'Shift+' : ''}${e.altKey ? 'Alt+' : ''}${e.key}`, currentQuestionNumber);
-        toast({
-          title: "❌ Shortcut Blocked",
-          description: "Keyboard shortcuts are disabled during the quiz.",
-          variant: "destructive",
-        });
-        return false;
+        if (error) {
+          console.error('Error updating session:', error);
+        }
+
+        // Check periodically if session is still valid
+        const interval = setInterval(async () => {
+          const { data, error } = await supabase
+            .from('quiz_users')
+            .select('current_session_id')
+            .eq('id', userId)
+            .single();
+
+          if (error) {
+            console.error('Error checking session:', error);
+            return;
+          }
+
+          if ((data as any).current_session_id !== sessionId) {
+            eliminateUser('Account logged in from another device');
+            clearInterval(interval);
+          }
+        }, 5000); // Check every 5 seconds
+
+        return () => clearInterval(interval);
+      } catch (error) {
+        console.error('Error setting up single login check:', error);
       }
     };
 
-    // Disable drag and drop
-    const handleDrop = (e: DragEvent) => {
-      e.preventDefault();
-      return false;
-    };
+    checkSingleLogin();
+  }, []);
 
-    const handleDragOver = (e: DragEvent) => {
-      e.preventDefault();
-      return false;
-    };
-
-    // Add event listeners
-    document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('selectstart', handleSelectStart);
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('drop', handleDrop);
-    document.addEventListener('dragover', handleDragOver);
-
-    // Add CSS to prevent text selection
-    document.body.style.userSelect = 'none';
-    document.body.style.webkitUserSelect = 'none';
-
-    return () => {
-      document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('selectstart', handleSelectStart);
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('drop', handleDrop);
-      document.removeEventListener('dragover', handleDragOver);
-
-      // Restore text selection
-      document.body.style.userSelect = '';
-      document.body.style.webkitUserSelect = '';
-    };
-  }, [isActive, currentQuestionNumber]);
+  if (isEliminated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-red-50">
+        <div className="text-center p-8 bg-white rounded-lg shadow-lg">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Quiz Ended</h2>
+          <p className="text-gray-700 mb-4">You have been eliminated from the quiz.</p>
+          <p className="text-sm text-gray-500">Redirecting to home page...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <AntiCheatContext.Provider value={{ isActive, setIsActive, logCheatingEvent }}>
+    <>
       {children}
       
-      {/* Warning Dialog */}
       <AlertDialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-amber-600">⚠️ Warning</AlertDialogTitle>
+            <AlertDialogTitle className="text-yellow-600">⚠️ Warning</AlertDialogTitle>
             <AlertDialogDescription>
-              You switched tabs or tried to leave. One more attempt will auto-submit your quiz.
+              {warningMessage}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -227,18 +254,8 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Cheating Detected Dialog */}
-      <AlertDialog open={showCheatingDialog} onOpenChange={() => {}}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600">⚠️ Cheating Detected!</AlertDialogTitle>
-            <AlertDialogDescription>
-              Your quiz has been auto-submitted due to suspicious activity. The page will redirect automatically.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-        </AlertDialogContent>
-      </AlertDialog>
-    </AntiCheatContext.Provider>
+    </>
   );
 };
+
+export default AntiCheatProvider;

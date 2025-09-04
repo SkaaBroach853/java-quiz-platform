@@ -37,9 +37,6 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
     );
   }
 
-  // Check if this question has no time limit
-  const hasTimeLimit = question.timeLimit > 0;
-
   // Reset state when question changes
   useEffect(() => {
     setSelectedAnswer(null);
@@ -83,16 +80,14 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
               section={question.section}
             />
           </div>
-          {hasTimeLimit && (
-            <div className="ml-8">
-              <CircularTimer
-                key={question.id} // Force reset timer for each question
-                duration={question.timeLimit}
-                onTimeUp={handleTimeUp}
-                isActive={!isAnswered}
-              />
-            </div>
-          )}
+          <div className="ml-8">
+            <CircularTimer
+              key={question.id} // Force reset timer for each question
+              duration={question.timeLimit}
+              onTimeUp={handleTimeUp}
+              isActive={!isAnswered}
+            />
+          </div>
         </div>
 
         {/* Question Card */}
@@ -173,18 +168,13 @@ const QuizQuestion: React.FC<QuizQuestionProps> = ({
           </CardContent>
         </Card>
 
-        {/* Quiz Status Message */}
+        {/* Quiz Started Message */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-start space-x-4">
             <div className="w-3 h-3 bg-green-500 rounded-full mt-2"></div>
             <div>
               <h3 className="font-semibold text-gray-900 mb-1">Quiz Started</h3>
-              <p className="text-gray-600 text-sm">
-                {hasTimeLimit 
-                  ? "Good luck! Take your time and read each question carefully." 
-                  : "No time limit for this question. Take your time to think through the answer."
-                }
-              </p>
+              <p className="text-gray-600 text-sm">Good luck! Take your time and read each question carefully.</p>
             </div>
           </div>
         </div>
