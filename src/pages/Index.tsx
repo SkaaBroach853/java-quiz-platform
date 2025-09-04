@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Question, QuizResult } from '@/types/quiz';
-import QuizQuestion from '@/components/QuizQuestion';
+import QuizWrapper from '@/components/QuizWrapper';
 import ResultsScreen from '@/components/ResultsScreen';
 import EntryForm from '@/components/EntryForm';
+import { AntiCheatProvider } from '@/components/AntiCheatProvider';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 
@@ -21,6 +22,7 @@ const Index = () => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [result, setResult] = useState<Omit<QuizResult, 'email'> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -56,7 +58,7 @@ const Index = () => {
           alert("Error fetching user. Please try again.");
           return;
         }
-  
+
         if (!existingUser) {
           // User doesn't exist, create new user
           console.log("User not found, creating new user");
@@ -64,7 +66,8 @@ const Index = () => {
             .from('quiz_users')
             .insert([{ 
               email: quizSession.email, 
-              access_code: quizSession.accessCode
+              access_code: quizSession.accessCode,
+              name: quizSession.name
             }])
             .select()
             .single();
@@ -74,10 +77,24 @@ const Index = () => {
             alert("Error creating user. Please try again.");
             return;
           }
-        } else if (existingUser.has_completed) {
-          alert("You have already completed this quiz and cannot attempt it again.");
-          navigate('/');
-          return;
+          
+          setUserId(newUser.id);
+        } else {
+          if (existingUser.has_completed) {
+            alert("You have already completed this quiz and cannot attempt it again.");
+            navigate('/');
+            return;
+          }
+          
+          setUserId(existingUser.id);
+          
+          // Update name if not present
+          if (!existingUser.name && quizSession.name) {
+            await supabase
+              .from('quiz_users')
+              .update({ name: quizSession.name })
+              .eq('id', existingUser.id);
+          }
         }
 
         const { data, error } = await supabase
@@ -157,15 +174,13 @@ const Index = () => {
         return scores;
       }, { section1: 0, section2: 0, section3: 0 });
 
-      // Mock completion time (replace with actual calculation)
-      const startTime = Date.now() - (30 * 60 * 1000); // Mock start time
-      const currentTime = Date.now();
-      const completionTime = (currentTime - startTime) / (1000 * 60); // in minutes
+      // Mock completion time calculation - use actual elapsed time in seconds
+      const completionTimeInSeconds = 120; // This should be calculated based on actual quiz duration
 
       const quizResult = {
         totalScore: correctAnswers,
         sectionScores,
-        completionTime,
+        completionTime: completionTimeInSeconds, // Store as seconds
         completedAt: new Date()
       };
 
@@ -216,7 +231,7 @@ const Index = () => {
               user_id: user.id,
               total_score: correctAnswers,
               section_scores: sectionScores,
-              completion_time: Math.round(completionTime * 100) / 100, // Round to 2 decimal places
+              completion_time: completionTimeInSeconds, // Store as seconds, not minutes
               completed_at: new Date().toISOString(),
               total_questions: totalQuestions,
             },
@@ -236,6 +251,61 @@ const Index = () => {
     }
   };
 
+  const handleAutoSubmit = async () => {
+    if (!questions) return;
+
+    // Auto-submit the quiz
+    const totalQuestions = questions.length;
+    const correctAnswers = questions.reduce((count, question, index) => {
+      return answers[index] === question.correctAnswer ? count + 1 : count;
+    }, 0);
+
+    const sectionScores = questions.reduce((scores, question, index) => {
+      if (answers[index] === question.correctAnswer) {
+        scores[`section${question.section}` as keyof typeof scores] += 1;
+      }
+      return scores;
+    }, { section1: 0, section2: 0, section3: 0 });
+
+    const completionTimeInSeconds = 120; // Use actual time tracking
+
+    const quizResult = {
+      totalScore: correctAnswers,
+      sectionScores,
+      completionTime: completionTimeInSeconds,
+      completedAt: new Date()
+    };
+
+    setResult(quizResult);
+    setIsCompleted(true);
+
+    // Save to database
+    if (userId) {
+      try {
+        await supabase
+          .from('quiz_users')
+          .update({ 
+            has_completed: true,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+
+        await supabase
+          .from('quiz_results')
+          .insert([{
+            user_id: userId,
+            total_score: correctAnswers,
+            section_scores: sectionScores,
+            completion_time: completionTimeInSeconds,
+            completed_at: new Date().toISOString(),
+            total_questions: totalQuestions,
+          }]);
+      } catch (error) {
+        console.error("Error saving auto-submit result:", error);
+      }
+    }
+  };
+
   if (loading) {
     return <div className="min-h-screen bg-gray-100 flex items-center justify-center">Loading...</div>;
   }
@@ -251,28 +321,39 @@ const Index = () => {
   // Fix the QuizResult type issue in the completion handler
   if (isCompleted && result) {
     const quizResult: QuizResult = {
-      email: quizSession.email || '',
+      email: quizSession?.email || '',
       totalScore: result.totalScore || 0,
       sectionScores: result.sectionScores || { section1: 0, section2: 0, section3: 0 },
       completionTime: result.completionTime || 0,
       completedAt: result.completedAt || new Date()
     };
     
-    return <ResultsScreen result={quizResult} />;
+    return <ResultsScreen result={quizResult} userName={quizSession?.name} />;
+  }
+
+  if (!userId || !quizSession) {
+    return <div>Loading...</div>;
   }
 
   return (
-    <div>
-      {questions && questions.length > 0 && (
-        <QuizQuestion
-          question={questions[currentQuestionIndex]}
-          questionNumber={currentQuestionIndex + 1}
-          totalQuestions={questions.length}
-          onAnswer={handleAnswer}
-          onTimeUp={handleNextQuestion}
-        />
-      )}
-    </div>
+    <AntiCheatProvider
+      userEmail={quizSession.email}
+      userId={userId}
+      currentQuestionNumber={currentQuestionIndex + 1}
+      onAutoSubmit={handleAutoSubmit}
+    >
+      <div>
+        {questions && questions.length > 0 && (
+          <QuizWrapper
+            question={questions[currentQuestionIndex]}
+            questionNumber={currentQuestionIndex + 1}
+            totalQuestions={questions.length}
+            onAnswer={handleAnswer}
+            onTimeUp={handleNextQuestion}
+          />
+        )}
+      </div>
+    </AntiCheatProvider>
   );
 };
 

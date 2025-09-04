@@ -3,14 +3,15 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Trophy, Clock } from 'lucide-react';
 import { QuizResult } from '../types/quiz';
-import { formatTime, minutesToSeconds } from '@/utils/timeFormat';
+import { formatTime, minutesToSeconds, formatCompletionTime } from '@/utils/timeFormat';
 
 interface ResultsScreenProps {
   result: QuizResult;
+  userName?: string;
   onRestart?: () => void;
 }
 
-const ResultsScreen: React.FC<ResultsScreenProps> = ({ result }) => {
+const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
   const { completionTime } = result;
 
   const appreciationMessages = [
@@ -43,7 +44,7 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result }) => {
             </CardTitle>
             
             <div className="text-xl text-quiz-success font-semibold">
-              Thank You for Taking the Quiz
+              Thank You{userName ? `, ${userName}` : ''} for Taking the Quiz
             </div>
           </CardHeader>
           
@@ -51,7 +52,7 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result }) => {
             {/* Completion Time */}
             <div className="flex justify-center items-center space-x-2 text-muted-foreground">
               <Clock size={16} />
-              <span>Completed in {formatTime(minutesToSeconds(completionTime))}</span>
+              <span>Completed in {formatCompletionTime(completionTime)}</span>
             </div>
             
             {/* Appreciation Message */}

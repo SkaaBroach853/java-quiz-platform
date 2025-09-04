@@ -1,21 +1,25 @@
 
-// Utility function to format time in seconds to human-readable format
 export const formatTime = (totalSeconds: number): string => {
-  if (totalSeconds < 60) {
-    return `${totalSeconds}s`;
-  }
-  
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  return `${minutes}m ${seconds}s`;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
-// Convert minutes to seconds for consistent time handling
 export const minutesToSeconds = (minutes: number): number => {
   return Math.round(minutes * 60);
 };
 
-// Convert seconds to minutes for backward compatibility
-export const secondsToMinutes = (seconds: number): number => {
-  return seconds / 60;
+export const formatCompletionTime = (timeInSeconds: number): string => {
+  if (timeInSeconds < 60) {
+    return `${Math.round(timeInSeconds)} seconds`;
+  }
+  
+  const minutes = Math.floor(timeInSeconds / 60);
+  const remainingSeconds = Math.round(timeInSeconds % 60);
+  
+  if (remainingSeconds === 0) {
+    return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+  }
+  
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 };

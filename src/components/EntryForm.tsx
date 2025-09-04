@@ -34,8 +34,9 @@ const EntryForm = () => {
       try {
         const { data: existingUser, error } = await supabase
           .from('quiz_users')
-          .select('has_completed')
+          .select('has_completed, name')
           .eq('email', email)
+          .eq('access_code', accessCode)
           .maybeSingle();
 
         if (error && error.code !== 'PGRST116') {
@@ -48,13 +49,45 @@ const EntryForm = () => {
           return;
         }
 
-        if (existingUser && existingUser.has_completed) {
+        if (existingUser?.has_completed) {
           toast({
             title: "Quiz Already Completed",
             description: "This email has already been used to complete the quiz. You cannot attempt again.",
             variant: "destructive",
           });
           return;
+        }
+
+        // Create or update user with name if doesn't exist
+        if (!existingUser) {
+          const { error: createError } = await supabase
+            .from('quiz_users')
+            .insert([{ 
+              email: email, 
+              access_code: accessCode,
+              name: name
+            }]);
+
+          if (createError) {
+            console.error('Error creating user:', createError);
+            toast({
+              title: "Error",
+              description: "Failed to register. Please try again.",
+              variant: "destructive",
+            });
+            return;
+          }
+        } else if (!existingUser.name) {
+          // Update existing user with name
+          const { error: updateError } = await supabase
+            .from('quiz_users')
+            .update({ name: name })
+            .eq('email', email)
+            .eq('access_code', accessCode);
+
+          if (updateError) {
+            console.error('Error updating user name:', updateError);
+          }
         }
 
         // Show rules modal
