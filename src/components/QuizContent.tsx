@@ -5,6 +5,89 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Question } from '@/types/quiz';
+// new 
+import React, { useState, useEffect } from 'react';
+import { useQuizSession } from '@/hooks/useQuizSession';
+
+const QuizComponent = ({ userEmail, accessCode, questions }) => {
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [isQuizComplete, setIsQuizComplete] = useState(false);
+
+  const {
+    sessionData,
+    isLoading: sessionLoading,
+    error: sessionError,
+    initializeSession,
+    updateActivity,
+    completeSession
+  } = useQuizSession({ userEmail, accessCode });
+
+  // Initialize session when component mounts
+  useEffect(() => {
+    initializeSession(currentQuestion);
+  }, [initializeSession]);
+
+  // Update activity when question changes
+  useEffect(() => {
+    if (sessionData && !isQuizComplete) {
+      updateActivity(currentQuestion);
+    }
+  }, [currentQuestion, sessionData, updateActivity, isQuizComplete]);
+
+  const handleNextQuestion = async () => {
+    if (currentQuestion < questions.length - 1) {
+      const nextQuestion = currentQuestion + 1;
+      setCurrentQuestion(nextQuestion);
+      await updateActivity(nextQuestion);
+    }
+  };
+
+  const handleSubmitQuiz = async () => {
+    setIsQuizComplete(true);
+    await completeSession();
+    console.log('Quiz completed!');
+    // Handle post-completion logic
+  };
+
+  if (sessionLoading) {
+    return <div>Initializing quiz session...</div>;
+  }
+
+  if (sessionError) {
+    return <div>Error: {sessionError}</div>;
+  }
+
+  return (
+    <div className="quiz-container">
+      {/* Quiz content */}
+      <div className="quiz-question">
+        {/* Your question content */}
+      </div>
+      
+      <div className="quiz-controls">
+        {currentQuestion < questions.length - 1 ? (
+          <button onClick={handleNextQuestion}>Next Question</button>
+        ) : (
+          <button onClick={handleSubmitQuiz}>Submit Quiz</button>
+        )}
+      </div>
+
+      {/* Optional: Show session info for debugging */}
+      {sessionData && (
+        <div className="session-debug">
+          Session ID: {sessionData.sessionId}
+          {sessionData.isNewSession && <span> (New Session)</span>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default QuizComponent;
+
+// new end
+
 
 interface QuizContentProps {
   questions: Question[];
