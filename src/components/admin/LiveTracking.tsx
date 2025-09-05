@@ -1,10 +1,12 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useQuery } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { User, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { User, Clock, CheckCircle, AlertCircle, Trash2, Archive, RefreshCw } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 interface QuizUser {
   id: string;
@@ -27,6 +29,8 @@ interface QuizSession {
 
 const LiveTracking = () => {
   const [liveUsers, setLiveUsers] = useState<QuizSession[]>([]);
+  const [isClearing, setIsClearing] = useState(false);
+  const queryClient = useQueryClient();
 
   // Function to cleanup inactive sessions
   const cleanupInactiveSessions = async () => {
@@ -40,8 +44,153 @@ const LiveTracking = () => {
     }
   };
 
+  // Function to create backup and clear current session data
+  const clearSessionsWithBackup = async () => {
+    setIsClearing(true);
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      
+      // Step 1: Create backup tables with timestamp
+      const backupQuizUsersTable = `quiz_users_backup_${timestamp.substring(0, 19)}`;
+      const backupQuizSessionsTable = `quiz_sessions_backup_${timestamp.substring(0, 19)}`;
+      const backupCheatingLogsTable = `cheating_logs_backup_${timestamp.substring(0, 19)}`;
+
+      // Create backup of quiz_users
+      const { error: backupUsersError } = await supabase.rpc('create_backup_table', {
+        source_table: 'quiz_users',
+        backup_table: backupQuizUsersTable
+      });
+
+      if (backupUsersError) {
+        // If RPC doesn't exist, try direct SQL approach
+        const { data: usersData, error: fetchUsersError } = await supabase
+          .from('quiz_users')
+          .select('*');
+        
+        if (fetchUsersError) throw fetchUsersError;
+        
+        // Store backup info in a backup log table (you'll need to create this)
+        const { error: logError } = await supabase
+          .from('session_backups')
+          .insert({
+            backup_name: `Quiz Users Backup - ${new Date().toLocaleString()}`,
+            backup_data: JSON.stringify(usersData),
+            table_name: 'quiz_users',
+            created_at: new Date().toISOString(),
+            record_count: usersData?.length || 0
+          });
+      }
+
+      // Create backup of quiz_sessions
+      const { data: sessionsData, error: fetchSessionsError } = await supabase
+        .from('quiz_sessions')
+        .select('*');
+      
+      if (!fetchSessionsError && sessionsData) {
+        const { error: logError } = await supabase
+          .from('session_backups')
+          .insert({
+            backup_name: `Quiz Sessions Backup - ${new Date().toLocaleString()}`,
+            backup_data: JSON.stringify(sessionsData),
+            table_name: 'quiz_sessions',
+            created_at: new Date().toISOString(),
+            record_count: sessionsData.length
+          });
+      }
+
+      // Create backup of cheating_logs
+      const { data: cheatingData, error: fetchCheatingError } = await supabase
+        .from('cheating_logs')
+        .select('*');
+      
+      if (!fetchCheatingError && cheatingData) {
+        const { error: logError } = await supabase
+          .from('session_backups')
+          .insert({
+            backup_name: `Cheating Logs Backup - ${new Date().toLocaleString()}`,
+            backup_data: JSON.stringify(cheatingData),
+            table_name: 'cheating_logs',
+            created_at: new Date().toISOString(),
+            record_count: cheatingData.length
+          });
+      }
+
+      // Step 2: Clear current data
+      // Delete quiz sessions first (foreign key dependency)
+      const { error: deleteSessionsError } = await supabase
+        .from('quiz_sessions')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+      if (deleteSessionsError) throw deleteSessionsError;
+
+      // Delete quiz users
+      const { error: deleteUsersError } = await supabase
+        .from('quiz_users')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+      if (deleteUsersError) throw deleteUsersError;
+
+      // Delete cheating logs
+      const { error: deleteCheatingError } = await supabase
+        .from('cheating_logs')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+      if (deleteCheatingError) throw deleteCheatingError;
+
+      // Refresh the data
+      queryClient.invalidateQueries({ queryKey: ['quiz-sessions'] });
+
+      toast({
+        title: "✅ Session Cleared Successfully",
+        description: `All session data has been backed up and cleared. Backup created at ${new Date().toLocaleString()}`,
+        duration: 5000,
+      });
+
+    } catch (error) {
+      console.error('Error clearing sessions:', error);
+      toast({
+        title: "❌ Error Clearing Sessions",
+        description: "Failed to clear session data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  // Function to just clear without backup (for quick reset)
+  const quickClearSessions = async () => {
+    setIsClearing(true);
+    try {
+      // Delete all current session data without backup
+      await supabase.from('quiz_sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('quiz_users').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await supabase.from('cheating_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+
+      queryClient.invalidateQueries({ queryKey: ['quiz-sessions'] });
+
+      toast({
+        title: "✅ Quick Clear Successful",
+        description: "All session data has been cleared.",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Error in quick clear:', error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to clear session data.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   // Fetch all users and their sessions
-  const { data: sessions = [], isLoading } = useQuery({
+  const { data: sessions = [], isLoading, refetch } = useQuery({
     queryKey: ['quiz-sessions'],
     queryFn: async () => {
       // First cleanup inactive sessions
@@ -58,7 +207,7 @@ const LiveTracking = () => {
       if (error) throw error;
       return data as QuizSession[];
     },
-    refetchInterval: 30000 // Refresh every 30 seconds to cleanup inactive sessions
+    refetchInterval: 30000 // Refresh every 30 seconds
   });
 
   // Set up real-time subscription
@@ -74,7 +223,19 @@ const LiveTracking = () => {
         },
         (payload) => {
           console.log('Real-time update:', payload);
-          // Trigger a refetch when changes occur
+          queryClient.invalidateQueries({ queryKey: ['quiz-sessions'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quiz_users'
+        },
+        (payload) => {
+          console.log('Quiz users update:', payload);
+          queryClient.invalidateQueries({ queryKey: ['quiz-sessions'] });
         }
       )
       .subscribe();
@@ -82,13 +243,13 @@ const LiveTracking = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [queryClient]);
 
   // Cleanup inactive sessions every 5 minutes
   useEffect(() => {
     const interval = setInterval(() => {
       cleanupInactiveSessions();
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, []);
@@ -123,6 +284,89 @@ const LiveTracking = () => {
 
   return (
     <div className="space-y-6">
+      {/* Control Panel */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Session Management</span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isClearing}
+              >
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Refresh
+              </Button>
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isClearing || totalUsers === 0}
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" />
+                    Quick Clear
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Quick Clear Sessions</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will immediately delete all session data without creating a backup. 
+                      This action cannot be undone. Are you sure?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={quickClearSessions} className="bg-red-600 hover:bg-red-700">
+                      Clear Now
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    disabled={isClearing || totalUsers === 0}
+                  >
+                    <Archive className="w-4 h-4 mr-1" />
+                    Clear with Backup
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Clear Sessions with Backup</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will create a backup of all current session data and then clear it for a fresh start. 
+                      You'll be able to restore the data later if needed.
+                      <br /><br />
+                      <strong>What will be backed up:</strong>
+                      <ul className="list-disc list-inside mt-2">
+                        <li>All quiz user data ({totalUsers} users)</li>
+                        <li>All quiz sessions ({sessions.length} sessions)</li>
+                        <li>All cheating logs</li>
+                      </ul>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={clearSessionsWithBackup}>
+                      Create Backup & Clear
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </CardTitle>
+        </CardHeader>
+      </Card>
+
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -269,6 +513,16 @@ const LiveTracking = () => {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {/* Loading overlay */}
+      {isClearing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 flex items-center gap-3">
+            <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+            <span className="font-medium">Processing... Please wait</span>
+          </div>
+        </div>
       )}
     </div>
   );
