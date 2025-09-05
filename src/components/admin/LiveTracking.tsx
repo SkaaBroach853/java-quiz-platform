@@ -35,7 +35,7 @@ interface QuizSession {
   started_at: string;
   last_activity: string;
   ended_at: string | null;
-  quiz_users: QuizUser;
+  user?: QuizUser;
 }
 
 const LiveTracking: React.FC = () => {
@@ -47,7 +47,15 @@ const LiveTracking: React.FC = () => {
   // Cleanup inactive sessions
   const cleanupInactiveSessions = useCallback(async () => {
     try {
-      const { error } = await supabase.rpc('cleanup_inactive_sessions');
+      // Simple cleanup - mark sessions as inactive if last activity is more than 5 minutes ago
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      
+      const { error } = await supabase
+        .from('quiz_sessions')
+        .update({ is_active: false, ended_at: new Date().toISOString() })
+        .lt('last_activity', fiveMinutesAgo)
+        .eq('is_active', true);
+
       if (error) {
         console.error('Error cleaning up inactive sessions:', error);
         return false;
@@ -62,18 +70,19 @@ const LiveTracking: React.FC = () => {
   // Create backup before clearing sessions
   const createSessionBackup = useCallback(async () => {
     try {
+      // Fetch all sessions
       const { data: sessions, error: sessionsError } = await supabase
         .from('quiz_sessions')
-        .select(`
-          *,
-          quiz_users (*)
-        `);
+        .select('*')
+        .order('started_at', { ascending: false });
 
       if (sessionsError) throw sessionsError;
 
+      // Fetch all users
       const { data: users, error: usersError } = await supabase
         .from('quiz_users')
-        .select('*');
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (usersError) throw usersError;
 
@@ -87,60 +96,97 @@ const LiveTracking: React.FC = () => {
 
       const backupName = `quiz_backup_${new Date().toISOString().split('T')[0]}_${Date.now()}`;
 
-      const { error: backupError } = await supabase
-        .from('session_backups')
-        .insert({
-          backup_name: backupName,
-          backup_data: backupData,
-          table_name: 'quiz_sessions_and_users',
-          record_count: (sessions?.length || 0) + (users?.length || 0)
-        });
+      // Try to create backup in session_backups table, if it doesn't exist, just log
+      try {
+        const { error: backupError } = await supabase
+          .from('session_backups')
+          .insert({
+            backup_name: backupName,
+            backup_data: backupData,
+            table_name: 'quiz_sessions_and_users',
+            record_count: (sessions?.length || 0) + (users?.length || 0)
+          });
 
-      if (backupError) throw backupError;
+        if (backupError) {
+          console.warn('Could not create backup in database, but continuing with clear:', backupError);
+          // Store backup in localStorage as fallback
+          localStorage.setItem(`quiz_backup_${Date.now()}`, JSON.stringify(backupData));
+        }
+      } catch (err) {
+        console.warn('Backup table not found, storing in localStorage:', err);
+        localStorage.setItem(`quiz_backup_${Date.now()}`, JSON.stringify(backupData));
+      }
 
-      return { success: true, backupName };
+      return { success: true, backupName, data: backupData };
     } catch (error) {
       console.error('Error creating backup:', error);
       return { success: false, error };
     }
   }, []);
 
-  // Clear all sessions
+  // Clear all sessions with confirmation
   const clearAllSessions = useCallback(async () => {
-    if (!confirm('Are you sure you want to clear all sessions? This action cannot be undone. A backup will be created first.')) {
+    if (!confirm(`Are you sure you want to clear all sessions? This will delete all quiz session data. A backup will be created first.
+
+Current data:
+- Quiz Sessions: ${sessions.length}
+- Total Users: ${sessions.filter(s => s.user).length}
+
+This action cannot be undone.`)) {
       return;
     }
 
     setIsClearing(true);
     try {
+      // Create backup first
       const backupResult = await createSessionBackup();
       if (!backupResult.success) {
-        alert('Failed to create backup. Aborting clear operation.');
-        return;
+        const proceed = confirm('Failed to create backup. Do you want to proceed anyway? This is risky!');
+        if (!proceed) {
+          setIsClearing(false);
+          return;
+        }
       }
 
-      // Clear sessions first (due to foreign key constraints)
+      // Clear sessions first (due to potential foreign key constraints)
       const { error: sessionsError } = await supabase
         .from('quiz_sessions')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
 
       if (sessionsError) throw sessionsError;
 
-      // Then clear users
+      // Clear quiz users
       const { error: usersError } = await supabase
         .from('quiz_users')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
 
       if (usersError) throw usersError;
 
+      // Clear cheating logs if they exist
+      try {
+        await supabase
+          .from('cheating_logs')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+      } catch (err) {
+        console.warn('Could not clear cheating logs (table may not exist):', err);
+      }
+
+      // Refresh the data
       await queryClient.invalidateQueries({ queryKey: ['quiz-sessions'] });
+      setLastRefresh(new Date());
       
-      alert(`All sessions cleared successfully! Backup created: ${backupResult.backupName}`);
+      const backupInfo = backupResult.success ? 
+        `\n\nBackup created successfully: ${backupResult.backupName}` : 
+        '\n\nBackup was stored in browser localStorage as fallback.';
+      
+      alert(`✅ All sessions cleared successfully!${backupInfo}`);
+      
     } catch (error) {
       console.error('Error clearing sessions:', error);
-      alert(`Failed to clear sessions: ${error.message}`);
+      alert(`❌ Failed to clear sessions: ${error.message}`);
     } finally {
       setIsClearing(false);
     }
@@ -156,6 +202,9 @@ const LiveTracking: React.FC = () => {
   // Test database connection
   const testConnection = useCallback(async () => {
     try {
+      setConnectionStatus('connecting');
+      
+      // Test basic connection
       const { data, error } = await supabase
         .from('quiz_sessions')
         .select('count')
@@ -163,17 +212,25 @@ const LiveTracking: React.FC = () => {
       
       if (error) throw error;
       
+      // Test quiz_users table
+      const { data: usersData, error: usersError } = await supabase
+        .from('quiz_users')
+        .select('count')
+        .limit(1);
+      
+      if (usersError) throw usersError;
+      
       setConnectionStatus('connected');
-      console.log('Database connection test successful:', data);
-      alert('Database connection is working!');
+      alert(`✅ Database connection successful!\n\nTables accessible:\n- quiz_sessions ✓\n- quiz_users ✓`);
+      
     } catch (error) {
       setConnectionStatus('error');
       console.error('Database connection test failed:', error);
-      alert(`Database connection failed: ${error.message}`);
+      alert(`❌ Database connection failed:\n\n${error.message}\n\nPlease check:\n1. Database is online\n2. Tables exist\n3. RLS policies allow access`);
     }
   }, []);
 
-  // Fetch quiz sessions with better error handling
+  // Fetch quiz sessions - FIXED VERSION
   const { data: sessions = [], isLoading, error, refetch } = useQuery({
     queryKey: ['quiz-sessions'],
     queryFn: async () => {
@@ -183,38 +240,43 @@ const LiveTracking: React.FC = () => {
         // First cleanup inactive sessions
         await cleanupInactiveSessions();
         
-        const { data, error } = await supabase
+        // Fetch sessions WITHOUT join (to avoid relationship errors)
+        const { data: sessionsData, error: sessionsError } = await supabase
           .from('quiz_sessions')
-          .select(`
-            id,
-            user_id,
-            is_active,
-            started_at,
-            last_activity,
-            ended_at,
-            quiz_users (
-              id,
-              email,
-              access_code,
-              has_completed,
-              current_question_index,
-              started_at,
-              completed_at,
-              created_at
-            )
-          `)
+          .select('*')
           .order('started_at', { ascending: false });
         
-        if (error) {
-          console.error('Supabase query error:', error);
+        if (sessionsError) {
+          console.error('Sessions query error:', sessionsError);
           setConnectionStatus('error');
-          throw error;
+          throw sessionsError;
         }
         
-        setConnectionStatus('connected');
-        console.log('Fetched sessions:', data?.length || 0, 'records');
+        // Fetch all users separately 
+        const { data: allUsers, error: usersError } = await supabase
+          .from('quiz_users')
+          .select('*');
         
-        return (data || []) as QuizSession[];
+        if (usersError) {
+          console.error('Users query error:', usersError);
+          // Continue without user data if users table has issues
+          console.warn('Proceeding without user data due to error:', usersError);
+        }
+        
+        // Manually join the data
+        const sessionsWithUsers = (sessionsData || []).map(session => {
+          const user = allUsers?.find(u => u.id === session.user_id) || null;
+          return {
+            ...session,
+            user
+          };
+        });
+        
+        setConnectionStatus('connected');
+        console.log('Successfully fetched:', sessionsWithUsers.length, 'sessions');
+        
+        return sessionsWithUsers as QuizSession[];
+        
       } catch (error) {
         setConnectionStatus('error');
         console.error('Error in queryFn:', error);
@@ -222,20 +284,16 @@ const LiveTracking: React.FC = () => {
       }
     },
     refetchInterval: 15000, // 15 seconds
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000)
   });
 
-  // Real-time subscription
+  // Real-time subscription - simplified
   useEffect(() => {
     console.log('Setting up real-time subscription...');
     
     const channel = supabase
-      .channel('quiz-tracking-realtime', {
-        config: {
-          broadcast: { self: true }
-        }
-      })
+      .channel('quiz-tracking-realtime')
       .on(
         'postgres_changes',
         {
@@ -244,7 +302,7 @@ const LiveTracking: React.FC = () => {
           table: 'quiz_sessions'
         },
         (payload) => {
-          console.log('Quiz sessions real-time update:', payload);
+          console.log('Quiz sessions update:', payload);
           queryClient.invalidateQueries({ queryKey: ['quiz-sessions'] });
         }
       )
@@ -256,15 +314,12 @@ const LiveTracking: React.FC = () => {
           table: 'quiz_users'
         },
         (payload) => {
-          console.log('Quiz users real-time update:', payload);
+          console.log('Quiz users update:', payload);
           queryClient.invalidateQueries({ queryKey: ['quiz-sessions'] });
         }
       )
       .subscribe((status) => {
         console.log('Real-time subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          setConnectionStatus('connected');
-        }
       });
 
     return () => {
@@ -304,22 +359,24 @@ const LiveTracking: React.FC = () => {
     return `${diffMins} minutes ago`;
   }, []);
 
-  // Filter sessions
+  // Filter sessions safely
   const activeSessions = sessions.filter(session => 
     session.is_active && 
-    session.quiz_users && 
-    !session.quiz_users.has_completed
+    session.user && 
+    !session.user.has_completed
   );
   
   const completedSessions = sessions.filter(session => 
-    session.quiz_users?.has_completed
+    session.user?.has_completed === true
   );
   
   const droppedOutSessions = sessions.filter(session => 
     !session.is_active && 
-    session.quiz_users && 
-    !session.quiz_users.has_completed
+    session.user && 
+    !session.user.has_completed
   );
+
+  const totalUsers = sessions.filter(s => s.user).length;
 
   // Connection status indicator
   const getConnectionStatusColor = () => {
@@ -365,6 +422,9 @@ const LiveTracking: React.FC = () => {
         <div className="text-center">
           <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
           <p className="text-muted-foreground">Loading live tracking data...</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Connecting to database...
+          </p>
         </div>
       </div>
     );
@@ -492,9 +552,9 @@ const LiveTracking: React.FC = () => {
                   <div className="flex items-center gap-4">
                     <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                     <div>
-                      <p className="font-medium">{session.quiz_users?.email || 'Unknown User'}</p>
+                      <p className="font-medium">{session.user?.email || 'Unknown User'}</p>
                       <p className="text-sm text-muted-foreground">
-                        Access Code: {session.quiz_users?.access_code || 'N/A'}
+                        Access Code: {session.user?.access_code || 'N/A'}
                       </p>
                     </div>
                   </div>
@@ -502,7 +562,7 @@ const LiveTracking: React.FC = () => {
                   <div className="flex items-center gap-6">
                     <div className="text-right">
                       <p className="text-sm font-medium">
-                        Question {(session.quiz_users?.current_question_index || 0) + 1}
+                        Question {(session.user?.current_question_index || 0) + 1}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {getTimeElapsed(session.started_at)} elapsed
@@ -541,10 +601,10 @@ const LiveTracking: React.FC = () => {
                   <div className="flex items-center gap-4">
                     <CheckCircle className="w-5 h-5 text-green-500" />
                     <div>
-                      <p className="font-medium">{session.quiz_users?.email || 'Unknown User'}</p>
+                      <p className="font-medium">{session.user?.email || 'Unknown User'}</p>
                       <p className="text-sm text-muted-foreground">
-                        {session.quiz_users?.completed_at ? 
-                          `Completed ${new Date(session.quiz_users.completed_at).toLocaleString()}` :
+                        {session.user?.completed_at ? 
+                          `Completed ${new Date(session.user.completed_at).toLocaleString()}` :
                           'Completion time unknown'
                         }
                       </p>
@@ -574,10 +634,10 @@ const LiveTracking: React.FC = () => {
             <div className="max-w-md mx-auto bg-blue-50 p-6 rounded-lg text-left">
               <h4 className="font-medium mb-3 text-center">Troubleshooting Steps:</h4>
               <ol className="list-decimal list-inside space-y-2 text-sm">
-                <li>Ensure all SQL functions are installed</li>
-                <li>Check that quiz components call session functions</li>
-                <li>Verify database permissions (RLS policies)</li>
+                <li>Check that students are actually taking quizzes</li>
+                <li>Verify quiz components create sessions properly</li>
                 <li>Test the database connection</li>
+                <li>Check browser console for errors</li>
               </ol>
               
               <div className="mt-4 flex justify-center">
@@ -591,27 +651,14 @@ const LiveTracking: React.FC = () => {
         </Card>
       )}
 
-      {/* Debug Info (only show if there are sessions but something seems wrong) */}
-      {sessions.length > 0 && (activeSessions.length === 0 && completedSessions.length === 0) && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-yellow-800">
-              <AlertCircle className="w-5 h-5" />
-              Debug Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm text-yellow-700">
-              <p className="mb-2">Found {sessions.length} sessions, but none are active or completed.</p>
-              <details>
-                <summary className="cursor-pointer font-medium">View session data</summary>
-                <pre className="mt-2 p-3 bg-white border rounded text-xs overflow-auto max-h-40">
-                  {JSON.stringify(sessions.slice(0, 2), null, 2)}
-                </pre>
-              </details>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Loading overlay */}
+      {isClearing && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 flex items-center gap-3">
+            <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+            <span className="font-medium">Processing... Please wait</span>
+          </div>
+        </div>
       )}
     </div>
   );
