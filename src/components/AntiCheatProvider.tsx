@@ -38,7 +38,7 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
   const [tabSwitchWarnings, setTabSwitchWarnings] = useState(0);
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [showCheatingDialog, setShowCheatingDialog] = useState(false);
-  const [multipleScreenWarnings, setMultipleScreenWarnings] = useState(0);
+  // Remove multiple screen warnings state
   const [fullscreenWarnings, setFullscreenWarnings] = useState(0);
   const activationTimeRef = useRef<number | null>(null);
 
@@ -71,6 +71,13 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
     if (!isActive) return;
 
     activationTimeRef.current = Date.now();
+    
+    // Add a 2-second grace period to prevent immediate triggering
+    setTimeout(() => {
+      if (activationTimeRef.current) {
+        activationTimeRef.current = Date.now();
+      }
+    }, 2000);
 
     const el: any = document.documentElement as any;
     if (!document.fullscreenElement && el.requestFullscreen) {
@@ -111,7 +118,7 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
 
     const withinGrace = () => {
       if (!activationTimeRef.current) return false;
-      return Date.now() - activationTimeRef.current < 1000;
+      return Date.now() - activationTimeRef.current < 3000; // 3 second grace period
     };
 
     const handleVisibilityChange = () => {
@@ -180,30 +187,7 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
     };
   }, [isActive, tabSwitchWarnings, currentQuestionNumber]);
 
-  // Multiple screen detection
-  useEffect(() => {
-    if (!isActive) return;
-
-    const checkScreens = () => {
-      if (screen.availWidth !== window.screen.width || screen.availHeight !== window.screen.height) {
-        if (multipleScreenWarnings === 0) {
-          setMultipleScreenWarnings(1);
-          logCheatingEvent('multiple_screens_warning', 'Multiple screens detected - first warning', currentQuestionNumber);
-          toast({
-            title: "⚠️ Multiple Screens Detected",
-            description: "Multiple display setup detected. One more violation will auto-submit your quiz.",
-            variant: "destructive",
-          });
-        } else {
-          handleAutoSubmit('Multiple screens detected after warning');
-        }
-      }
-    };
-
-    // Check periodically
-    const interval = setInterval(checkScreens, 5000);
-    return () => clearInterval(interval);
-  }, [isActive, multipleScreenWarnings, currentQuestionNumber]);
+  // Remove multiple screen detection as per user request
 
   // Disable right-click, copy-paste, text selection, keyboard shortcuts
   useEffect(() => {

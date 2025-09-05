@@ -217,6 +217,7 @@ export type Database = {
       quiz_users: {
         Row: {
           access_code: string
+          branch: string | null
           completed_at: string | null
           created_at: string
           current_question_index: number | null
@@ -229,6 +230,7 @@ export type Database = {
         }
         Insert: {
           access_code: string
+          branch?: string | null
           completed_at?: string | null
           created_at?: string
           current_question_index?: number | null
@@ -241,6 +243,7 @@ export type Database = {
         }
         Update: {
           access_code?: string
+          branch?: string | null
           completed_at?: string | null
           created_at?: string
           current_question_index?: number | null

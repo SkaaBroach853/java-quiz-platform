@@ -11,6 +11,7 @@ import { Tables } from '@/integrations/supabase/types';
 interface QuizSession {
   name: string;
   email: string;
+  branch: string;
   accessCode: string;
 }
 
@@ -30,10 +31,11 @@ const Index = () => {
   useEffect(() => {
     const name = searchParams.get('name');
     const email = searchParams.get('email');
+    const branch = searchParams.get('branch');
     const accessCode = searchParams.get('accessCode');
 
-    if (name && email && accessCode) {
-      setQuizSession({ name, email, accessCode });
+    if (name && email && branch && accessCode) {
+      setQuizSession({ name, email, branch, accessCode });
     } else {
       // For now, set loading to false to prevent infinite loading
       setLoading(false);
@@ -68,7 +70,8 @@ const Index = () => {
             .insert([{ 
               email: quizSession.email, 
               access_code: quizSession.accessCode,
-              name: quizSession.name
+              name: quizSession.name,
+              branch: quizSession.branch
             }])
             .select()
             .single();
@@ -89,11 +92,14 @@ const Index = () => {
           
           setUserId(existingUser.id);
           
-          // Update name if not present
-          if (!existingUser.name && quizSession.name) {
+          // Update name and branch if not present
+          if ((!existingUser.name && quizSession.name) || (!existingUser.branch && quizSession.branch)) {
             await supabase
               .from('quiz_users')
-              .update({ name: quizSession.name })
+              .update({ 
+                name: quizSession.name,
+                branch: quizSession.branch
+              })
               .eq('id', existingUser.id);
           }
         }

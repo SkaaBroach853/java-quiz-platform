@@ -1,18 +1,20 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Trophy, Medal, Award, Crown } from 'lucide-react';
+import { Trophy, Medal, Award, Crown, Filter } from 'lucide-react';
 import { useTotalQuestions } from '@/hooks/useTotalQuestions';
-import { formatTime } from '@/utils/timeFormat';
+import { formatCompletionTime } from '@/utils/timeFormat';
+import { Button } from '@/components/ui/button';
 
 interface LeaderboardEntry {
   id: string;
   name: string;
   email: string;
   access_code: string;
+  branch: string;
   total_score: number;
   completion_time: number;
   completed_at: string;
@@ -20,11 +22,12 @@ interface LeaderboardEntry {
 }
 
 const Leaderboard = () => {
+  const [selectedBranch, setSelectedBranch] = useState<string>('');
   // Fetch total questions count
   const { data: totalQuestions = 0 } = useTotalQuestions();
 
   const { data: leaderboard = [], isLoading } = useQuery({
-    queryKey: ['leaderboard'],
+    queryKey: ['leaderboard', selectedBranch],
     queryFn: async () => {
       // First get all quiz results
       const { data: results, error: resultsError } = await supabase
@@ -46,7 +49,7 @@ const Leaderboard = () => {
       const userIds = results.map(result => result.user_id).filter(Boolean);
       const { data: users, error: usersError } = await supabase
         .from('quiz_users')
-        .select('id, name, email, access_code')
+        .select('id, name, email, access_code, branch')
         .in('id', userIds);
 
       if (usersError) {
@@ -55,21 +58,50 @@ const Leaderboard = () => {
       }
 
       // Combine the data
-      const rankedResults = results.map((result, index): LeaderboardEntry => {
+      const combinedResults = results.map((result): LeaderboardEntry => {
         const user = users?.find(u => u.id === result.user_id);
         return {
           id: result.id,
           name: user?.name || 'No Name',
           email: user?.email || 'Unknown',
           access_code: user?.access_code || 'N/A',
+          branch: user?.branch || 'N/A',
           total_score: result.total_score,
           completion_time: result.completion_time || 0,
           completed_at: result.completed_at,
-          rank: index + 1
+          rank: 0 // Will be set after filtering
         };
       });
 
+      // Filter by branch if selected
+      const filteredResults = selectedBranch 
+        ? combinedResults.filter(result => result.branch === selectedBranch)
+        : combinedResults;
+
+      // Re-rank after filtering
+      const rankedResults = filteredResults.map((result, index) => ({
+        ...result,
+        rank: index + 1
+      }));
+
       return rankedResults;
+    },
+    refetchOnWindowFocus: false
+  });
+
+  // Get unique branches for filter
+  const { data: branches = [] } = useQuery({
+    queryKey: ['branches'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('quiz_users')
+        .select('branch')
+        .not('branch', 'is', null);
+      
+      if (error) throw error;
+      
+      const uniqueBranches = [...new Set(data.map(user => user.branch).filter(Boolean))];
+      return uniqueBranches.sort();
     }
   });
 
@@ -122,12 +154,29 @@ const Leaderboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Trophy className="w-6 h-6 text-yellow-500" />
-        <h2 className="text-2xl font-bold">Leaderboard</h2>
-        <Badge variant="secondary" className="ml-2">
-          {leaderboard.length} participants
-        </Badge>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Trophy className="w-6 h-6 text-yellow-500" />
+          <h2 className="text-2xl font-bold">Leaderboard</h2>
+          <Badge variant="secondary" className="ml-2">
+            {leaderboard.length} participants
+          </Badge>
+        </div>
+        
+        {/* Branch Filter */}
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <select
+            value={selectedBranch}
+            onChange={(e) => setSelectedBranch(e.target.value)}
+            className="border rounded-md px-3 py-1 text-sm bg-background"
+          >
+            <option value="">All Branches</option>
+            {branches.map(branch => (
+              <option key={branch} value={branch}>{branch}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -145,6 +194,11 @@ const Leaderboard = () => {
                   
                   <div>
                     <h3 className="font-semibold text-lg">{entry.name}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline" className="text-xs">
+                        {entry.branch}
+                      </Badge>
+                    </div>
                     <p className="text-sm text-muted-foreground">{entry.email}</p>
                     <p className="text-sm text-muted-foreground">
                       Access Code: {entry.access_code}
@@ -165,7 +219,7 @@ const Leaderboard = () => {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Time: {formatTime(entry.completion_time)}
+                    Time: {formatCompletionTime(entry.completion_time)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {Math.round((entry.total_score / totalQuestions) * 100)}% accuracy
@@ -211,7 +265,7 @@ const Leaderboard = () => {
             <div className="text-center">
               <p className="text-2xl font-bold text-purple-600">
                 {leaderboard.length > 0 
-                  ? formatTime(Math.round(leaderboard.reduce((sum, entry) => sum + entry.completion_time, 0) / leaderboard.length))
+                  ? formatCompletionTime(Math.round(leaderboard.reduce((sum, entry) => sum + entry.completion_time, 0) / leaderboard.length))
                   : '0s'
                 }
               </p>
