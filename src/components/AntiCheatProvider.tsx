@@ -84,20 +84,37 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
     if (isProcessingViolationRef.current) return;
     
     isProcessingViolationRef.current = true;
-    setShowCheatingDialog(true);
-    logCheatingEvent('auto_submit', reason, currentQuestionNumber);
     
-    toast({
-      title: '❌ Quiz Auto-Submitted',
-      description: 'Your quiz has been submitted due to suspicious activity.',
-      variant: 'destructive',
-      duration: 3000,
+    // Force fullscreen mode to ensure user sees the auto-submit dialog
+    const forceFullscreen = async () => {
+      try {
+        const el: any = document.documentElement as any;
+        if (!document.fullscreenElement && el.requestFullscreen) {
+          await el.requestFullscreen();
+          console.log('Forced fullscreen for auto-submit dialog');
+        }
+      } catch (error) {
+        console.warn('Could not force fullscreen for auto-submit:', error);
+      }
+    };
+    
+    // Force fullscreen first, then show dialog
+    forceFullscreen().then(() => {
+      setShowCheatingDialog(true);
+      logCheatingEvent('auto_submit', reason, currentQuestionNumber);
+      
+      toast({
+        title: '❌ Quiz Auto-Submitted',
+        description: 'Your quiz has been submitted due to suspicious activity.',
+        variant: 'destructive',
+        duration: 3000,
+      });
+      
+      // Auto-submit after 3 seconds
+      autoSubmitTimeoutRef.current = setTimeout(() => {
+        onAutoSubmit();
+      }, 3000);
     });
-    
-    // Auto-submit after 3 seconds
-    autoSubmitTimeoutRef.current = setTimeout(() => {
-      onAutoSubmit();
-    }, 3000);
   };
 
   const isWithinGracePeriod = (): boolean => {
