@@ -23,6 +23,7 @@ const Index = () => {
   const [result, setResult] = useState<Omit<QuizResult, 'email'> | null>(null);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [quizStartTime, setQuizStartTime] = useState<number | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -138,6 +139,7 @@ const Index = () => {
         
         setQuestions(shuffledQuestions);
         setAnswers(Array(mappedQuestions.length).fill(null));
+        setQuizStartTime(Date.now());
       } catch (err) {
         console.error("Unexpected error:", err);
         alert("An unexpected error occurred. Please try again.");
@@ -174,8 +176,8 @@ const Index = () => {
         return scores;
       }, { section1: 0, section2: 0, section3: 0 });
 
-      // Mock completion time calculation - use actual elapsed time in seconds
-      const completionTimeInSeconds = 120; // This should be calculated based on actual quiz duration
+      // Calculate actual elapsed time in seconds
+      const completionTimeInSeconds = Math.max(1, Math.round(((Date.now() - (quizStartTime || Date.now())) / 1000)));
 
       const quizResult = {
         totalScore: correctAnswers,
@@ -267,7 +269,7 @@ const Index = () => {
       return scores;
     }, { section1: 0, section2: 0, section3: 0 });
 
-    const completionTimeInSeconds = 120; // Use actual time tracking
+    const completionTimeInSeconds = Math.max(1, Math.round(((Date.now() - (quizStartTime || Date.now())) / 1000))); // Use actual time tracking
 
     const quizResult = {
       totalScore: correctAnswers,

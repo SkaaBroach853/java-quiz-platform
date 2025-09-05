@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -39,6 +39,8 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [showCheatingDialog, setShowCheatingDialog] = useState(false);
   const [multipleScreenWarnings, setMultipleScreenWarnings] = useState(0);
+  const [fullscreenWarnings, setFullscreenWarnings] = useState(0);
+  const activationTimeRef = useRef<number | null>(null);
 
   const logCheatingEvent = async (eventType: string, description: string, questionNumber?: number) => {
     try {
@@ -64,20 +66,65 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
     }, 3000); // Give user 3 seconds to see the warning before auto-submit
   };
 
+  // Fullscreen enforcement and monitoring
+  useEffect(() => {
+    if (!isActive) return;
+
+    activationTimeRef.current = Date.now();
+
+    const el: any = document.documentElement as any;
+    if (!document.fullscreenElement && el.requestFullscreen) {
+      el.requestFullscreen().catch((err: any) => {
+        console.warn('Fullscreen request failed:', err);
+      });
+    }
+
+    const onFsChange = () => {
+      const inFs = !!document.fullscreenElement;
+      const withinGrace = activationTimeRef.current && Date.now() - (activationTimeRef.current || 0) < 1000;
+      if (!inFs) {
+        if (withinGrace) return;
+        if (fullscreenWarnings === 0) {
+          setFullscreenWarnings(1);
+          setShowWarningDialog(true);
+          logCheatingEvent('fullscreen_exit_warning', 'User exited fullscreen - first warning', currentQuestionNumber);
+          toast({
+            title: '⚠️ Warning',
+            description: 'You exited fullscreen. One more attempt will auto-submit your quiz.',
+            variant: 'destructive',
+          });
+        } else {
+          handleAutoSubmit('Exited fullscreen after warning');
+        }
+      }
+    };
+
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+    };
+  }, [isActive, fullscreenWarnings, currentQuestionNumber]);
+
   // Tab switching / Window blur detection
   useEffect(() => {
     if (!isActive) return;
 
+    const withinGrace = () => {
+      if (!activationTimeRef.current) return false;
+      return Date.now() - activationTimeRef.current < 1000;
+    };
+
     const handleVisibilityChange = () => {
+      if (withinGrace()) return;
       if (document.hidden) {
         if (tabSwitchWarnings === 0) {
           setTabSwitchWarnings(1);
           setShowWarningDialog(true);
           logCheatingEvent('tab_switch_warning', 'User switched tabs - first warning', currentQuestionNumber);
           toast({
-            title: "⚠️ Warning",
-            description: "You switched tabs or tried to leave. One more attempt will auto-submit your quiz.",
-            variant: "destructive",
+            title: '⚠️ Warning',
+            description: 'You switched tabs or tried to leave. One more attempt will auto-submit your quiz.',
+            variant: 'destructive',
           });
         } else {
           handleAutoSubmit('User switched tabs after warning');
@@ -86,6 +133,7 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
     };
 
     const handleBlur = () => {
+      if (withinGrace()) return;
       if (tabSwitchWarnings === 0) {
         setTabSwitchWarnings(1);
         setShowWarningDialog(true);
@@ -95,12 +143,40 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
       }
     };
 
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isActive) return;
+      if (tabSwitchWarnings === 0) {
+        setTabSwitchWarnings(1);
+        setShowWarningDialog(true);
+        logCheatingEvent('attempt_close_warning', 'User attempted to close or reload - first warning', currentQuestionNumber);
+      } else {
+        handleAutoSubmit('Window close or reload after warning');
+      }
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    const handlePageHide = () => {
+      if (withinGrace()) return;
+      if (tabSwitchWarnings === 0) {
+        setTabSwitchWarnings(1);
+        setShowWarningDialog(true);
+        logCheatingEvent('page_hide_warning', 'Page hidden - first warning', currentQuestionNumber);
+      } else {
+        handleAutoSubmit('Page hidden after warning');
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleBlur);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
     };
   }, [isActive, tabSwitchWarnings, currentQuestionNumber]);
 
@@ -152,17 +228,23 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
 
     // Disable keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Disable common shortcuts
+      // Disable common shortcuts (including Meta for macOS)
       if (
-        (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'a' || e.key === 's' || e.key === 'p')) ||
-        (e.ctrlKey && e.shiftKey && e.key === 'I') ||
-        e.key === 'F12' ||
-        (e.ctrlKey && e.shiftKey && e.key === 'C') ||
-        (e.ctrlKey && e.key === 'u') ||
-        (e.altKey && e.key === 'Tab')
+        (e.ctrlKey || e.metaKey || e.altKey) && (
+          e.key.toLowerCase() === 'c' ||
+          e.key.toLowerCase() === 'v' ||
+          e.key.toLowerCase() === 'a' ||
+          e.key.toLowerCase() === 's' ||
+          e.key.toLowerCase() === 'p' ||
+          e.key.toLowerCase() === 'u'
+        )
+      || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'C'))
+      || e.key === 'F12'
+      || e.key === 'PrintScreen'
+      || (e.altKey && e.key === 'Tab')
       ) {
         e.preventDefault();
-        logCheatingEvent('keyboard_shortcut', `User attempted: ${e.ctrlKey ? 'Ctrl+' : ''}${e.shiftKey ? 'Shift+' : ''}${e.altKey ? 'Alt+' : ''}${e.key}`, currentQuestionNumber);
+        logCheatingEvent('keyboard_shortcut', `User attempted: ${e.ctrlKey ? 'Ctrl+' : ''}${e.metaKey ? 'Meta+' : ''}${e.shiftKey ? 'Shift+' : ''}${e.altKey ? 'Alt+' : ''}${e.key}`, currentQuestionNumber);
         toast({
           title: "❌ Shortcut Blocked",
           description: "Keyboard shortcuts are disabled during the quiz.",
@@ -170,6 +252,23 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
         });
         return false;
       }
+    };
+
+    // Block clipboard actions
+    const handleCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+      logCheatingEvent('clipboard_copy', 'User attempted to copy content', currentQuestionNumber);
+      toast({ title: '❌ Copy Blocked', description: 'Copy is disabled during the quiz.', variant: 'destructive' });
+    };
+    const handlePaste = (e: ClipboardEvent) => {
+      e.preventDefault();
+      logCheatingEvent('clipboard_paste', 'User attempted to paste content', currentQuestionNumber);
+      toast({ title: '❌ Paste Blocked', description: 'Paste is disabled during the quiz.', variant: 'destructive' });
+    };
+    const handleCut = (e: ClipboardEvent) => {
+      e.preventDefault();
+      logCheatingEvent('clipboard_cut', 'User attempted to cut content', currentQuestionNumber);
+      toast({ title: '❌ Cut Blocked', description: 'Cut is disabled during the quiz.', variant: 'destructive' });
     };
 
     // Disable drag and drop
@@ -182,11 +281,13 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
       e.preventDefault();
       return false;
     };
-
     // Add event listeners
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('selectstart', handleSelectStart);
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('copy', handleCopy as any);
+    document.addEventListener('paste', handlePaste as any);
+    document.addEventListener('cut', handleCut as any);
     document.addEventListener('drop', handleDrop);
     document.addEventListener('dragover', handleDragOver);
 
@@ -198,6 +299,9 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('selectstart', handleSelectStart);
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('copy', handleCopy as any);
+      document.removeEventListener('paste', handlePaste as any);
+      document.removeEventListener('cut', handleCut as any);
       document.removeEventListener('drop', handleDrop);
       document.removeEventListener('dragover', handleDragOver);
 

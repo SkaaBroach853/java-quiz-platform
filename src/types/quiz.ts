@@ -31,6 +31,6 @@ export interface QuizResult {
     section2: number;
     section3: number;
   };
-  completionTime: number; // in minutes
+  completionTime: number; // in seconds
   completedAt: Date;
 }
