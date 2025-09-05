@@ -34,7 +34,6 @@ interface QuizSession {
   is_active: boolean;
   started_at: string;
   last_activity: string;
-  ended_at: string | null;
   user?: QuizUser;
 }
 
@@ -44,15 +43,16 @@ const LiveTracking: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'connecting' | 'error'>('connecting');
   const queryClient = useQueryClient();
 
-  // Cleanup inactive sessions
+  // Cleanup inactive sessions - FIXED VERSION
   const cleanupInactiveSessions = useCallback(async () => {
     try {
-      // Simple cleanup - mark sessions as inactive if last activity is more than 5 minutes ago
+      // Mark sessions as inactive if last activity is more than 5 minutes ago
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
       
+      // Only update is_active field - remove ended_at since it doesn't exist
       const { error } = await supabase
         .from('quiz_sessions')
-        .update({ is_active: false, ended_at: new Date().toISOString() })
+        .update({ is_active: false })
         .lt('last_activity', fiveMinutesAgo)
         .eq('is_active', true);
 
@@ -96,26 +96,18 @@ const LiveTracking: React.FC = () => {
 
       const backupName = `quiz_backup_${new Date().toISOString().split('T')[0]}_${Date.now()}`;
 
-      // Try to create backup in session_backups table, if it doesn't exist, just log
-      try {
-        const { error: backupError } = await supabase
-          .from('session_backups')
-          .insert({
-            backup_name: backupName,
-            backup_data: backupData,
-            table_name: 'quiz_sessions_and_users',
-            record_count: (sessions?.length || 0) + (users?.length || 0)
-          });
-
-        if (backupError) {
-          console.warn('Could not create backup in database, but continuing with clear:', backupError);
-          // Store backup in localStorage as fallback
-          localStorage.setItem(`quiz_backup_${Date.now()}`, JSON.stringify(backupData));
-        }
-      } catch (err) {
-        console.warn('Backup table not found, storing in localStorage:', err);
-        localStorage.setItem(`quiz_backup_${Date.now()}`, JSON.stringify(backupData));
-      }
+      // Store backup in memory/state instead of database
+      const backupJson = JSON.stringify(backupData, null, 2);
+      console.log('Backup created:', backupName, backupData);
+      
+      // Offer download of backup
+      const blob = new Blob([backupJson], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${backupName}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
 
       return { success: true, backupName, data: backupData };
     } catch (error) {
@@ -124,9 +116,9 @@ const LiveTracking: React.FC = () => {
     }
   }, []);
 
-  // Clear all sessions with confirmation
+  // Clear all sessions with confirmation - FIXED VERSION
   const clearAllSessions = useCallback(async () => {
-    if (!confirm(`Are you sure you want to clear all sessions? This will delete all quiz session data. A backup will be created first.
+    if (!confirm(`Are you sure you want to clear all sessions? This will delete all quiz session data. A backup will be downloaded first.
 
 Current data:
 - Quiz Sessions: ${sessions.length}
@@ -179,8 +171,8 @@ This action cannot be undone.`)) {
       setLastRefresh(new Date());
       
       const backupInfo = backupResult.success ? 
-        `\n\nBackup created successfully: ${backupResult.backupName}` : 
-        '\n\nBackup was stored in browser localStorage as fallback.';
+        `\n\nBackup downloaded successfully: ${backupResult.backupName}.json` : 
+        '\n\nBackup creation failed, but data was cleared.';
       
       alert(`✅ All sessions cleared successfully!${backupInfo}`);
       
@@ -199,38 +191,43 @@ This action cannot be undone.`)) {
     setLastRefresh(new Date());
   }, [cleanupInactiveSessions, queryClient]);
 
-  // Test database connection
+  // Test database connection - IMPROVED VERSION
   const testConnection = useCallback(async () => {
     try {
       setConnectionStatus('connecting');
       
-      // Test basic connection
-      const { data, error } = await supabase
+      // Test quiz_sessions table structure
+      const { data: sessionsData, error: sessionsError } = await supabase
         .from('quiz_sessions')
-        .select('count')
+        .select('id, user_id, is_active, started_at, last_activity')
         .limit(1);
       
-      if (error) throw error;
+      if (sessionsError) throw new Error(`quiz_sessions: ${sessionsError.message}`);
       
       // Test quiz_users table
       const { data: usersData, error: usersError } = await supabase
         .from('quiz_users')
-        .select('count')
+        .select('id, email, access_code, has_completed, current_question_index, started_at, completed_at, created_at')
         .limit(1);
       
-      if (usersError) throw usersError;
+      if (usersError) throw new Error(`quiz_users: ${usersError.message}`);
       
       setConnectionStatus('connected');
-      alert(`✅ Database connection successful!\n\nTables accessible:\n- quiz_sessions ✓\n- quiz_users ✓`);
+      
+      // Get table info
+      const sessionsCount = sessionsData?.length || 0;
+      const usersCount = usersData?.length || 0;
+      
+      alert(`✅ Database connection successful!\n\nTables accessible:\n- quiz_sessions ✓ (${sessionsCount} records tested)\n- quiz_users ✓ (${usersCount} records tested)\n\nNote: Only testing column structure, not all data.`);
       
     } catch (error) {
       setConnectionStatus('error');
       console.error('Database connection test failed:', error);
-      alert(`❌ Database connection failed:\n\n${error.message}\n\nPlease check:\n1. Database is online\n2. Tables exist\n3. RLS policies allow access`);
+      alert(`❌ Database connection failed:\n\n${error.message}\n\nCommon issues:\n1. Database is offline\n2. Tables don't exist\n3. Column mismatch\n4. RLS policies blocking access`);
     }
   }, []);
 
-  // Fetch quiz sessions - FIXED VERSION
+  // Fetch quiz sessions - FIXED VERSION WITH BETTER ERROR HANDLING
   const { data: sessions = [], isLoading, error, refetch } = useQuery({
     queryKey: ['quiz-sessions'],
     queryFn: async () => {
@@ -240,26 +237,25 @@ This action cannot be undone.`)) {
         // First cleanup inactive sessions
         await cleanupInactiveSessions();
         
-        // Fetch sessions WITHOUT join (to avoid relationship errors)
+        // Fetch sessions with only fields that exist
         const { data: sessionsData, error: sessionsError } = await supabase
           .from('quiz_sessions')
-          .select('*')
+          .select('id, user_id, is_active, started_at, last_activity')
           .order('started_at', { ascending: false });
         
         if (sessionsError) {
           console.error('Sessions query error:', sessionsError);
           setConnectionStatus('error');
-          throw sessionsError;
+          throw new Error(`Failed to fetch sessions: ${sessionsError.message}`);
         }
         
         // Fetch all users separately 
         const { data: allUsers, error: usersError } = await supabase
           .from('quiz_users')
-          .select('*');
+          .select('id, email, access_code, has_completed, current_question_index, started_at, completed_at, created_at');
         
         if (usersError) {
           console.error('Users query error:', usersError);
-          // Continue without user data if users table has issues
           console.warn('Proceeding without user data due to error:', usersError);
         }
         
@@ -288,7 +284,7 @@ This action cannot be undone.`)) {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000)
   });
 
-  // Real-time subscription - simplified
+  // Real-time subscription - SIMPLIFIED AND MORE ROBUST
   useEffect(() => {
     console.log('Setting up real-time subscription...');
     
@@ -320,6 +316,11 @@ This action cannot be undone.`)) {
       )
       .subscribe((status) => {
         console.log('Real-time subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Real-time connection established');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Real-time connection failed');
+        }
       });
 
     return () => {
@@ -409,6 +410,11 @@ This action cannot be undone.`)) {
                 Test Database
               </Button>
             </div>
+            <div className="mt-4 p-3 bg-red-50 rounded-lg text-left">
+              <p className="text-xs text-red-600 font-mono">
+                Debug: {error.message}
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -469,6 +475,14 @@ This action cannot be undone.`)) {
                     <Trash2 className="w-4 h-4 mr-2" />
                   )}
                   Clear All ({sessions.length})
+                </Button>
+                <Button 
+                  onClick={testConnection} 
+                  variant="secondary" 
+                  size="sm"
+                >
+                  <Database className="w-4 h-4 mr-2" />
+                  Test DB
                 </Button>
               </div>
             </div>
@@ -638,6 +652,7 @@ This action cannot be undone.`)) {
                 <li>Verify quiz components create sessions properly</li>
                 <li>Test the database connection</li>
                 <li>Check browser console for errors</li>
+                <li>Verify database table structure</li>
               </ol>
               
               <div className="mt-4 flex justify-center">
