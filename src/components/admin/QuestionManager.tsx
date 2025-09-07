@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,6 +63,10 @@ const QuestionManager = () => {
         console.error('Error fetching questions:', error);
         throw error;
       }
+      
+      // Debug: Log the fetched questions to check data structure
+      console.log('Fetched questions:', data);
+      
       return data as Question[];
     }
   });
@@ -94,19 +97,25 @@ const QuestionManager = () => {
         imageUrl = publicUrl;
       }
 
+      // Ensure correct_answer is stored as integer, not string
+      const questionPayload = {
+        question: questionData.question,
+        options: questionData.options.filter(opt => opt.trim() !== ''), // Remove empty options
+        correct_answer: parseInt(questionData.correct_answer.toString()), // Ensure integer
+        section: parseInt(questionData.section.toString()),
+        difficulty: questionData.difficulty,
+        time_limit: parseInt(questionData.time_limit.toString()),
+        image_url: imageUrl || null, // Use null instead of empty string
+        updated_at: new Date().toISOString()
+      };
+
+      // Debug: Log the payload being saved
+      console.log('Saving question payload:', questionPayload);
+
       if (editingQuestion) {
         const { error } = await supabase
           .from('questions')
-          .update({ 
-            question: questionData.question,
-            options: questionData.options,
-            correct_answer: questionData.correct_answer,
-            section: questionData.section,
-            difficulty: questionData.difficulty,
-            time_limit: questionData.time_limit,
-            image_url: imageUrl,
-            updated_at: new Date().toISOString()
-          })
+          .update(questionPayload)
           .eq('id', editingQuestion.id);
         if (error) {
           console.error('Update error:', error);
@@ -116,13 +125,8 @@ const QuestionManager = () => {
         const { error } = await supabase
           .from('questions')
           .insert({
-            question: questionData.question,
-            options: questionData.options,
-            correct_answer: questionData.correct_answer,
-            section: questionData.section,
-            difficulty: questionData.difficulty,
-            time_limit: questionData.time_limit,
-            image_url: imageUrl
+            ...questionPayload,
+            created_at: new Date().toISOString()
           });
         if (error) {
           console.error('Insert error:', error);
@@ -193,10 +197,16 @@ const QuestionManager = () => {
   };
 
   const handleEdit = (question: Question) => {
+    // Ensure options array has 4 elements
+    const options = [...question.options];
+    while (options.length < 4) {
+      options.push('');
+    }
+    
     setFormData({
       question: question.question,
-      options: question.options,
-      correct_answer: question.correct_answer,
+      options: options,
+      correct_answer: parseInt(question.correct_answer.toString()), // Ensure integer
       section: question.section,
       difficulty: question.difficulty,
       time_limit: question.time_limit,
@@ -218,6 +228,15 @@ const QuestionManager = () => {
     const newOptions = [...formData.options];
     newOptions[index] = value;
     setFormData({ ...formData, options: newOptions });
+  };
+
+  // Validation function
+  const isFormValid = () => {
+    return (
+      formData.question.trim() !== '' &&
+      formData.options.filter(opt => opt.trim() !== '').length >= 2 &&
+      formData.options[formData.correct_answer]?.trim() !== ''
+    );
   };
 
   if (isLoading) {
@@ -251,18 +270,19 @@ const QuestionManager = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="question">Question</Label>
+              <Label htmlFor="question">Question *</Label>
               <Textarea
                 id="question"
                 value={formData.question}
                 onChange={(e) => setFormData({ ...formData, question: e.target.value })}
                 placeholder="Enter your question here..."
                 className="mt-1"
+                required
               />
             </div>
 
             <div>
-              <Label>Options</Label>
+              <Label>Options *</Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
                 {formData.options.map((option, index) => (
                   <div key={index} className="flex items-center gap-2">
@@ -270,13 +290,15 @@ const QuestionManager = () => {
                       value={option}
                       onChange={(e) => handleOptionChange(index, e.target.value)}
                       placeholder={`Option ${index + 1}`}
-                      className={formData.correct_answer === index ? 'border-green-500' : ''}
+                      className={formData.correct_answer === index && option.trim() !== '' ? 'border-green-500 bg-green-50' : ''}
                     />
                     <Button
                       type="button"
                       variant={formData.correct_answer === index ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setFormData({ ...formData, correct_answer: index })}
+                      disabled={option.trim() === ''}
+                      className={formData.correct_answer === index ? 'bg-green-600 hover:bg-green-700' : ''}
                     >
                       {formData.correct_answer === index ? '✓' : `${index + 1}`}
                     </Button>
@@ -284,7 +306,13 @@ const QuestionManager = () => {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Click the number button to mark the correct answer
+                Click the number button to mark the correct answer. At least 2 options are required.
+              </p>
+              <p className="text-xs text-green-600 mt-1">
+                Currently selected: Option {formData.correct_answer + 1} 
+                {formData.options[formData.correct_answer]?.trim() && 
+                  ` - "${formData.options[formData.correct_answer]}"`
+                }
               </p>
             </div>
 
@@ -366,7 +394,7 @@ const QuestionManager = () => {
             <div className="flex gap-2 pt-4">
               <Button 
                 onClick={() => saveMutation.mutate(formData)}
-                disabled={saveMutation.isPending}
+                disabled={saveMutation.isPending || !isFormValid()}
               >
                 {saveMutation.isPending ? 'Saving...' : (editingQuestion ? 'Update' : 'Add')} Question
               </Button>
@@ -374,6 +402,12 @@ const QuestionManager = () => {
                 Cancel
               </Button>
             </div>
+            
+            {!isFormValid() && (
+              <p className="text-sm text-red-500">
+                Please fill in the question, at least 2 options, and select a correct answer.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -388,6 +422,9 @@ const QuestionManager = () => {
                     <Badge variant="outline">Section {question.section}</Badge>
                     <Badge variant="secondary">{question.difficulty}</Badge>
                     <Badge variant="outline">{question.time_limit === 0 ? 'No limit' : `${question.time_limit}s`}</Badge>
+                    <Badge variant="default" className="bg-green-600">
+                      Correct: Option {parseInt(question.correct_answer.toString()) + 1}
+                    </Badge>
                   </div>
                   <h4 className="font-medium mb-2">{question.question}</h4>
                   {question.image_url && (
@@ -407,11 +444,21 @@ const QuestionManager = () => {
                     {question.options.map((option, index) => (
                       <div 
                         key={index} 
-                        className={`p-2 rounded ${question.correct_answer === index ? 'bg-green-100 text-green-800 font-medium' : 'bg-gray-50'}`}
+                        className={`p-2 rounded ${
+                          parseInt(question.correct_answer.toString()) === index 
+                            ? 'bg-green-100 text-green-800 font-medium border border-green-300' 
+                            : 'bg-gray-50'
+                        }`}
                       >
                         {index + 1}. {option}
+                        {parseInt(question.correct_answer.toString()) === index && ' ✓'}
                       </div>
                     ))}
+                  </div>
+                  
+                  {/* Debug info - remove in production */}
+                  <div className="mt-2 text-xs text-gray-500 bg-gray-100 p-2 rounded">
+                    Debug: correct_answer = {question.correct_answer} (type: {typeof question.correct_answer})
                   </div>
                 </div>
                 <div className="flex gap-2">
