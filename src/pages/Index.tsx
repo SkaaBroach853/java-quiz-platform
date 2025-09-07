@@ -157,26 +157,6 @@ const Index = () => {
     fetchQuestions();
   }, [quizSession]);
 
-  // Prevent going back after quiz completion
-  useEffect(() => {
-    if (isCompleted) {
-      // Replace current history entry to prevent going back to quiz
-      window.history.replaceState(null, '', window.location.pathname);
-      
-      // Add popstate listener to handle back button after completion
-      const handlePopState = (event: PopStateEvent) => {
-        // Redirect to login page when user tries to go back after completion
-        navigate('/', { replace: true });
-      };
-
-      window.addEventListener('popstate', handlePopState);
-      
-      return () => {
-        window.removeEventListener('popstate', handlePopState);
-      };
-    }
-  }, [isCompleted, navigate]);
-
   const handleAnswer = (answerIndex: number) => {
     const newAnswers = [...answers];
     newAnswers[currentQuestionIndex] = answerIndex;
