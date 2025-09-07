@@ -37,6 +37,7 @@ const Index = () => {
     if (name && email && branch && accessCode) {
       setQuizSession({ name, email, branch, accessCode });
     } else {
+      // For now, set loading to false to prevent infinite loading
       setLoading(false);
     }
   }, [navigate, searchParams]);
@@ -47,14 +48,13 @@ const Index = () => {
 
       try {
         setLoading(true);
-        
         // Check if user exists
         const { data: existingUser, error: userError } = await supabase
           .from('quiz_users')
           .select('*')
           .eq('email', quizSession.email)
           .eq('access_code', quizSession.accessCode)
-          .maybeSingle();
+          .maybeSingle(); // Use maybeSingle instead of single to handle no results
   
         if (userError) {
           console.error("Error fetching user:", userError);
@@ -120,7 +120,7 @@ const Index = () => {
           id: q.id,
           question: q.question,
           options: q.options,
-          correctAnswer: q.correct_answer, // This should already be 0-indexed from database
+          correctAnswer: q.correct_answer,
           section: q.section as 1 | 2 | 3,
           difficulty: q.difficulty as 'easy' | 'moderate' | 'hard',
           timeLimit: q.time_limit,
@@ -144,7 +144,7 @@ const Index = () => {
         const shuffledQuestions = [...section1Questions, ...section2Questions, ...section3Questions];
         
         setQuestions(shuffledQuestions);
-        setAnswers(Array(shuffledQuestions.length).fill(null)); // Use shuffledQuestions.length
+        setAnswers(Array(mappedQuestions.length).fill(null));
         setQuizStartTime(Date.now());
       } catch (err) {
         console.error("Unexpected error:", err);
@@ -160,9 +160,12 @@ const Index = () => {
   // Prevent going back after quiz completion
   useEffect(() => {
     if (isCompleted) {
+      // Replace current history entry to prevent going back to quiz
       window.history.replaceState(null, '', window.location.pathname);
       
+      // Add popstate listener to handle back button after completion
       const handlePopState = (event: PopStateEvent) => {
+        // Redirect to login page when user tries to go back after completion
         navigate('/', { replace: true });
       };
 
@@ -175,91 +178,9 @@ const Index = () => {
   }, [isCompleted, navigate]);
 
   const handleAnswer = (answerIndex: number) => {
-    console.log(`=== SCORING DEBUG ===`);
-    console.log(`Question ${currentQuestionIndex + 1}:`);
-    console.log(`Selected answer index: ${answerIndex}`);
-    console.log(`Correct answer index: ${questions?.[currentQuestionIndex]?.correctAnswer}`);
-    console.log(`Match: ${answerIndex === questions?.[currentQuestionIndex]?.correctAnswer}`);
-    
     const newAnswers = [...answers];
     newAnswers[currentQuestionIndex] = answerIndex;
     setAnswers(newAnswers);
-  };
-
-  const calculateResults = (questionsArray: Question[], answersArray: (number | null)[]) => {
-    const totalQuestions = questionsArray.length;
-    const correctAnswers = questionsArray.reduce((count, question, index) => {
-      const isCorrect = answersArray[index] === question.correctAnswer;
-      console.log(`Question ${index + 1}: Selected=${answersArray[index]}, Correct=${question.correctAnswer}, Match=${isCorrect}`);
-      return isCorrect ? count + 1 : count;
-    }, 0);
-
-    const sectionScores = questionsArray.reduce((scores, question, index) => {
-      if (answersArray[index] === question.correctAnswer) {
-        scores[`section${question.section}` as keyof typeof scores] += 1;
-      }
-      return scores;
-    }, { section1: 0, section2: 0, section3: 0 });
-
-    const completionTimeInSeconds = Math.max(1, Math.round(((Date.now() - (quizStartTime || Date.now())) / 1000)));
-
-    console.log(`Total correct answers: ${correctAnswers}/${totalQuestions}`);
-    console.log(`Section scores:`, sectionScores);
-
-    return {
-      totalScore: correctAnswers,
-      sectionScores,
-      completionTime: completionTimeInSeconds,
-      completedAt: new Date(),
-      totalQuestions
-    };
-  };
-
-  const saveQuizResult = async (resultData: any) => {
-    if (!userId || !quizSession) return;
-
-    try {
-      console.log("Saving quiz result for:", quizSession.email);
-      
-      // Mark user as completed first
-      const { error: updateError } = await supabase
-        .from('quiz_users')
-        .update({ 
-          has_completed: true,
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', userId);
-
-      if (updateError) {
-        console.error("Error updating user completion status:", updateError);
-        return;
-      }
-
-      // Save the quiz result
-      const { data: savedResult, error: resultError } = await supabase
-        .from('quiz_results')
-        .insert([
-          {
-            user_id: userId,
-            total_score: resultData.totalScore,
-            section_scores: resultData.sectionScores,
-            completion_time: resultData.completionTime,
-            completed_at: new Date().toISOString(),
-            total_questions: resultData.totalQuestions,
-          },
-        ])
-        .select()
-        .single();
-
-      if (resultError) {
-        console.error("Error saving quiz result:", resultError);
-        alert("Error saving quiz result. Please contact support.");
-      } else {
-        console.log("Quiz result saved successfully:", savedResult);
-      }
-    } catch (error) {
-      console.error("Error saving quiz result:", error);
-    }
   };
 
   const handleNextQuestion = async () => {
@@ -269,42 +190,148 @@ const Index = () => {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
       // Quiz is complete, calculate the result
-      console.log("=== FINAL SCORING ===");
-      const resultData = calculateResults(questions, answers);
+      const totalQuestions = questions.length;
+      const correctAnswers = questions.reduce((count, question, index) => {
+        return answers[index] === question.correctAnswer ? count + 1 : count;
+      }, 0);
+
+      const sectionScores = questions.reduce((scores, question, index) => {
+        if (answers[index] === question.correctAnswer) {
+          scores[`section${question.section}` as keyof typeof scores] += 1;
+        }
+        return scores;
+      }, { section1: 0, section2: 0, section3: 0 });
+
+      // Calculate actual elapsed time in seconds
+      const completionTimeInSeconds = Math.max(1, Math.round(((Date.now() - (quizStartTime || Date.now())) / 1000)));
 
       const quizResult = {
-        totalScore: resultData.totalScore,
-        sectionScores: resultData.sectionScores,
-        completionTime: resultData.completionTime,
-        completedAt: resultData.completedAt
+        totalScore: correctAnswers,
+        sectionScores,
+        completionTime: completionTimeInSeconds, // Store as seconds
+        completedAt: new Date()
       };
 
       setResult(quizResult);
       setIsCompleted(true);
 
-      // Save result to database
-      await saveQuizResult(resultData);
+      // Save result to Supabase with enhanced error handling
+      try {
+        console.log("Saving quiz result for:", quizSession?.email);
+        
+        const { data: user, error: userError } = await supabase
+          .from('quiz_users')
+          .select('id')
+          .eq('email', quizSession?.email)
+          .eq('access_code', quizSession?.accessCode)
+          .single();
+    
+        if (userError) {
+          console.error("Error fetching user for result save:", userError);
+          return;
+        }
+    
+        if (!user) {
+          console.error("User not found for result save");
+          return;
+        }
+
+        console.log("User found, saving result with user_id:", user.id);
+
+        // Mark user as completed first
+        const { error: updateError } = await supabase
+          .from('quiz_users')
+          .update({ 
+            has_completed: true,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+
+        if (updateError) {
+          console.error("Error updating user completion status:", updateError);
+        }
+
+        console.log("Inserting quiz result...");
+        const { data: resultData, error: resultError } = await supabase
+          .from('quiz_results')
+          .insert([
+            {
+              user_id: user.id,
+              total_score: correctAnswers,
+              section_scores: sectionScores,
+              completion_time: completionTimeInSeconds, // Store as seconds, not minutes
+              completed_at: new Date().toISOString(),
+              total_questions: totalQuestions,
+            },
+          ])
+          .select()
+          .single();
+
+        if (resultError) {
+          console.error("Error saving quiz result:", resultError);
+          alert("Error saving quiz result. Please contact support.");
+        } else {
+          console.log("Quiz result saved successfully:", resultData);
+        }
+      } catch (error) {
+        console.error("Unexpected error:", error);
+      }
     }
   };
 
   const handleAutoSubmit = async () => {
     if (!questions) return;
 
-    console.log("=== AUTO SUBMIT SCORING ===");
-    const resultData = calculateResults(questions, answers);
+    // Auto-submit the quiz
+    const totalQuestions = questions.length;
+    const correctAnswers = questions.reduce((count, question, index) => {
+      return answers[index] === question.correctAnswer ? count + 1 : count;
+    }, 0);
+
+    const sectionScores = questions.reduce((scores, question, index) => {
+      if (answers[index] === question.correctAnswer) {
+        scores[`section${question.section}` as keyof typeof scores] += 1;
+      }
+      return scores;
+    }, { section1: 0, section2: 0, section3: 0 });
+
+    const completionTimeInSeconds = Math.max(1, Math.round(((Date.now() - (quizStartTime || Date.now())) / 1000))); // Use actual time tracking
 
     const quizResult = {
-      totalScore: resultData.totalScore,
-      sectionScores: resultData.sectionScores,
-      completionTime: resultData.completionTime,
-      completedAt: resultData.completedAt
+      totalScore: correctAnswers,
+      sectionScores,
+      completionTime: completionTimeInSeconds,
+      completedAt: new Date()
     };
 
     setResult(quizResult);
     setIsCompleted(true);
 
-    // Save result to database
-    await saveQuizResult(resultData);
+    // Save to database
+    if (userId) {
+      try {
+        await supabase
+          .from('quiz_users')
+          .update({ 
+            has_completed: true,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+
+        await supabase
+          .from('quiz_results')
+          .insert([{
+            user_id: userId,
+            total_score: correctAnswers,
+            section_scores: sectionScores,
+            completion_time: completionTimeInSeconds,
+            completed_at: new Date().toISOString(),
+            total_questions: totalQuestions,
+          }]);
+      } catch (error) {
+        console.error("Error saving auto-submit result:", error);
+      }
+    }
   };
 
   if (loading) {
