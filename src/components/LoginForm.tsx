@@ -44,7 +44,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
     // Simulate authentication (replace with actual logic)
     try {
       // Demo access codes for testing
-      const validCodes = ['QUIZ2024', 'JAVA101', 'TEST123'];
+      const validCodes = ['QUIZ2025', 'JAVA101', 'TEST111'];
       
       if (validCodes.includes(accessCode.toUpperCase())) {
         onLogin(email, accessCode.toUpperCase());
