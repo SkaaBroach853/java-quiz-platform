@@ -205,13 +205,6 @@ export type Database = {
             referencedRelation: "quiz_users"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "quiz_sessions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "quiz_users"
-            referencedColumns: ["id"]
-          },
         ]
       }
       quiz_users: {
@@ -256,14 +249,93 @@ export type Database = {
         }
         Relationships: []
       }
+      session_backups: {
+        Row: {
+          backup_data: Json
+          backup_name: string
+          created_at: string | null
+          id: string
+          record_count: number | null
+          table_name: string
+        }
+        Insert: {
+          backup_data: Json
+          backup_name: string
+          created_at?: string | null
+          id?: string
+          record_count?: number | null
+          table_name: string
+        }
+        Update: {
+          backup_data?: Json
+          backup_name?: string
+          created_at?: string | null
+          id?: string
+          record_count?: number | null
+          table_name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      quiz_sessions_with_users: {
+        Row: {
+          answers: Json | null
+          id: string | null
+          is_active: boolean | null
+          last_activity: string | null
+          section_scores: Json | null
+          started_at: string | null
+          user: Json | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_quiz_sessions_user"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       cleanup_inactive_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      complete_quiz_session: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
+      get_user_by_access_code: {
+        Args: { p_access_code: string }
+        Returns: {
+          access_code: string
+          completed_at: string
+          current_question_index: number
+          email: string
+          has_completed: boolean
+          id: string
+          started_at: string
+        }[]
+      }
+      update_session_activity: {
+        Args: { p_current_question_index?: number; p_user_id: string }
+        Returns: boolean
+      }
+      upsert_quiz_session: {
+        Args: {
+          p_access_code: string
+          p_current_question_index?: number
+          p_user_email: string
+        }
+        Returns: {
+          is_new_session: boolean
+          session_id: string
+          user_id: string
+        }[]
       }
     }
     Enums: {
