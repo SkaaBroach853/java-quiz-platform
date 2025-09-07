@@ -12,7 +12,6 @@ import loginBackground from '@/assets/login-background.jpg';
 const EntryForm = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [branch, setBranch] = useState('');
   const [accessCode, setAccessCode] = useState('');
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
@@ -30,12 +29,12 @@ const EntryForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name && email && branch && accessCode) {
+    if (name && email && accessCode) {
       // Check if email has already been used
       try {
         const { data: existingUser, error } = await supabase
           .from('quiz_users')
-          .select('has_completed, name, branch')
+          .select('has_completed, name')
           .eq('email', email)
           .eq('access_code', accessCode)
           .maybeSingle();
@@ -66,8 +65,7 @@ const EntryForm = () => {
             .insert([{ 
               email: email, 
               access_code: accessCode,
-              name: name,
-              branch: branch
+              name: name
             }]);
 
           if (createError) {
@@ -79,11 +77,11 @@ const EntryForm = () => {
             });
             return;
           }
-        } else if (!existingUser.name || !existingUser.branch) {
-          // Update existing user with name and/or branch
+        } else if (!existingUser.name) {
+          // Update existing user with name
           const { error: updateError } = await supabase
             .from('quiz_users')
-            .update({ name: name, branch: branch })
+            .update({ name: name })
             .eq('email', email)
             .eq('access_code', accessCode);
 
@@ -107,8 +105,8 @@ const EntryForm = () => {
 
   const handleStartQuiz = () => {
     setShowRulesModal(false);
-    // Navigate to the quiz with name, email, branch and accessCode as search params
-    navigate(`/?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&branch=${encodeURIComponent(branch)}&accessCode=${encodeURIComponent(accessCode)}`);
+    // Navigate to the quiz with name, email and accessCode as search params
+    navigate(`/?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&accessCode=${encodeURIComponent(accessCode)}`);
   };
 
   return (
@@ -190,32 +188,6 @@ const EntryForm = () => {
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="branch" className="text-sm font-medium text-gray-700">
-                  Branch
-                </Label>
-                <div className="relative">
-                  <select
-                    id="branch"
-                    value={branch}
-                    onChange={(e) => setBranch(e.target.value)}
-                    className="w-full pl-10 h-12 border border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500 bg-white"
-                    required
-                  >
-                    <option value="">Select your branch</option>
-                    <option value="IOT">IOT</option>
-                    <option value="AIML">AIML</option>
-                    <option value="AIDS">AIDS</option>
-                    <option value="COMPS">COMPS</option>
-                  </select>
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                   </div>
                 </div>

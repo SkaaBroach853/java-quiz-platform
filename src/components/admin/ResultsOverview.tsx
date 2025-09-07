@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Trophy, Users, Clock, TrendingUp } from 'lucide-react';
 import { useTotalQuestions } from '@/hooks/useTotalQuestions';
-import { formatCompletionTime } from '@/utils/timeFormat';
+import { formatTime } from '@/utils/timeFormat';
 
 interface QuizResultFromDB {
   id: string;
@@ -150,7 +150,7 @@ const ResultsOverview = () => {
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-orange-500" />
               <div>
-                <p className="text-2xl font-bold">{formatCompletionTime(averageTime)}</p>
+                <p className="text-2xl font-bold">{formatTime(averageTime)}</p>
                 <p className="text-sm text-muted-foreground">Avg Time</p>
               </div>
             </div>
@@ -236,7 +236,7 @@ const ResultsOverview = () => {
                           S3: {result.section_scores.section3}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {formatCompletionTime(result.completion_time)} completion time
+                          {formatTime(result.completion_time)} completion time
                         </p>
                       </div>
                       
