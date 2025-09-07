@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Trophy, Clock } from 'lucide-react';
-import { useRouter } from 'next/router';
 
 // Define types locally to avoid import issues
 interface QuizQuestion {
@@ -36,15 +35,24 @@ const formatCompletionTime = (timeInSeconds: number): string => {
 
 const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
   const { completionTime, answers, questions } = result;
-  const router = useRouter();
 
-  // ✅ Prevent going back & redirect to login
+  // ✅ Prevent going back using browser history API (works with any router)
   useEffect(() => {
-    window.history.pushState(null, "", window.location.href);
-    window.onpopstate = function () {
-      router.replace("/login");
+    const preventBack = () => {
+      window.history.pushState(null, "", window.location.href);
+      window.onpopstate = function () {
+        // Redirect to login page or home
+        window.location.href = "/login";
+      };
     };
-  }, [router]);
+    
+    preventBack();
+    
+    // Cleanup function
+    return () => {
+      window.onpopstate = null;
+    };
+  }, []);
 
   // ✅ Fixed scoring logic - proper index-based comparison
   const score = questions.reduce((acc: number, q: QuizQuestion, i: number) => {
