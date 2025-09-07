@@ -88,6 +88,11 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
           </CardHeader>
           
           <CardContent className="space-y-6">
+            {/* Score */}
+            <div className="text-lg font-bold text-gray-800 text-center">
+              Your Score: {score}/{questions.length}
+            </div>
+
             {/* Completion Time */}
             <div className="flex justify-center items-center space-x-2 text-gray-500">
               <Clock size={16} />
