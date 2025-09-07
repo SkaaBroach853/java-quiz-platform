@@ -23,12 +23,31 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
     };
   }, [router]);
 
-  // ✅ Correct scoring based on index match
+  // ✅ Fixed scoring logic - proper index-based comparison
   const score = questions.reduce((acc: number, q: any, i: number) => {
-    if (answers[i] === q.correctAnswer) {
-      return acc + 1;
+    const userAnswer = answers[i];
+    const correctAnswer = q.correctAnswer;
+    
+    // Handle different correctAnswer formats
+    let isCorrect = false;
+    
+    if (typeof correctAnswer === 'number') {
+      // If correctAnswer is stored as index (0, 1, 2, 3)
+      isCorrect = userAnswer === correctAnswer;
+    } else if (typeof correctAnswer === 'string') {
+      // If correctAnswer is stored as option ID ('a', 'b', 'c', 'd') or option text
+      if (correctAnswer.length === 1 && ['a', 'b', 'c', 'd'].includes(correctAnswer.toLowerCase())) {
+        // Convert option letter to index
+        const correctIndex = correctAnswer.toLowerCase().charCodeAt(0) - 'a'.charCodeAt(0);
+        isCorrect = userAnswer === correctIndex;
+      } else {
+        // If correctAnswer is stored as full option text, compare with user's selected option text
+        const userSelectedText = q.options && q.options[userAnswer] ? q.options[userAnswer] : '';
+        isCorrect = correctAnswer === userSelectedText;
+      }
     }
-    return acc;
+    
+    return isCorrect ? acc + 1 : acc;
   }, 0);
 
   const appreciationMessages = [
