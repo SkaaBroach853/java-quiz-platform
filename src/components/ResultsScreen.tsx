@@ -1,19 +1,11 @@
-import React, { useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import React from 'react';
 import { Trophy, Clock } from 'lucide-react';
 
 // Define types locally to avoid import issues
-interface QuizQuestion {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswer: number | string;
-}
-
 interface QuizResult {
   completionTime: number;
   answers: number[];
-  questions: QuizQuestion[];
+  questions: any[];
 }
 
 interface ResultsScreenProps {
@@ -22,7 +14,32 @@ interface ResultsScreenProps {
   onRestart?: () => void;
 }
 
-// Utility function to format time (inline to avoid import issues)
+// Local Card components to replace @/components/ui/card
+const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <div className={`bg-white rounded-lg shadow-lg border ${className}`}>
+    {children}
+  </div>
+);
+
+const CardHeader: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <div className={`p-6 ${className}`}>
+    {children}
+  </div>
+);
+
+const CardTitle: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <h2 className={`text-2xl font-bold ${className}`}>
+    {children}
+  </h2>
+);
+
+const CardContent: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
+  <div className={`p-6 pt-0 ${className}`}>
+    {children}
+  </div>
+);
+
+// Local time formatting function to replace @/utils/timeFormat
 const formatCompletionTime = (timeInSeconds: number): string => {
   const minutes = Math.floor(timeInSeconds / 60);
   const seconds = timeInSeconds % 60;
@@ -34,52 +51,7 @@ const formatCompletionTime = (timeInSeconds: number): string => {
 };
 
 const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
-  const { completionTime, answers, questions } = result;
-
-  // ✅ Prevent going back using browser history API (works with any router)
-  useEffect(() => {
-    const preventBack = () => {
-      window.history.pushState(null, "", window.location.href);
-      window.onpopstate = function () {
-        // Redirect to login page or home
-        window.location.href = "/login";
-      };
-    };
-    
-    preventBack();
-    
-    // Cleanup function
-    return () => {
-      window.onpopstate = null;
-    };
-  }, []);
-
-  // ✅ Fixed scoring logic - proper index-based comparison
-  const score = questions.reduce((acc: number, q: QuizQuestion, i: number) => {
-    const userAnswer = answers[i];
-    const correctAnswer = q.correctAnswer;
-    
-    // Handle different correctAnswer formats
-    let isCorrect = false;
-    
-    if (typeof correctAnswer === 'number') {
-      // If correctAnswer is stored as index (0, 1, 2, 3)
-      isCorrect = userAnswer === correctAnswer;
-    } else if (typeof correctAnswer === 'string') {
-      // If correctAnswer is stored as option ID ('a', 'b', 'c', 'd') or option text
-      if (correctAnswer.length === 1 && ['a', 'b', 'c', 'd'].includes(correctAnswer.toLowerCase())) {
-        // Convert option letter to index
-        const correctIndex = correctAnswer.toLowerCase().charCodeAt(0) - 'a'.charCodeAt(0);
-        isCorrect = userAnswer === correctIndex;
-      } else {
-        // If correctAnswer is stored as full option text, compare with user's selected option text
-        const userSelectedText = q.options && q.options[userAnswer] ? q.options[userAnswer] : '';
-        isCorrect = correctAnswer === userSelectedText;
-      }
-    }
-    
-    return isCorrect ? acc + 1 : acc;
-  }, 0);
+  const { completionTime } = result;
 
   const appreciationMessages = [
     "🎉 Congratulations on completing the Java Programming Quiz!",
@@ -92,10 +64,10 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
   const randomMessage = appreciationMessages[Math.floor(Math.random() * appreciationMessages.length)];
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="w-full max-w-2xl space-y-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-gray-100 p-4">
+      <div className="w-full max-w-2xl space-y-6 animate-pulse">
         {/* Main Results Card */}
-        <Card className="shadow-lg border-0 bg-white">
+        <Card className="text-center">
           <CardHeader className="space-y-4">
             <div className="flex justify-center">
               <div className="p-4 rounded-full bg-green-100">
@@ -106,23 +78,18 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
               </div>
             </div>
             
-            <CardTitle className="text-3xl font-bold text-gray-800 text-center">
+            <CardTitle className="text-3xl font-bold text-gray-800">
               Quiz Complete!
             </CardTitle>
             
-            <div className="text-xl text-green-600 font-semibold text-center">
+            <div className="text-xl text-green-600 font-semibold">
               Thank You{userName ? `, ${userName}` : ''} for Taking the Quiz
             </div>
           </CardHeader>
           
           <CardContent className="space-y-6">
-            {/* Score */}
-            <div className="text-lg font-bold text-gray-800 text-center">
-              Your Score: {score}/{questions.length}
-            </div>
-
             {/* Completion Time */}
-            <div className="flex justify-center items-center space-x-2 text-gray-600">
+            <div className="flex justify-center items-center space-x-2 text-gray-500">
               <Clock size={16} />
               <span>Completed in {formatCompletionTime(completionTime)}</span>
             </div>
@@ -132,7 +99,7 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
               <p className="text-lg text-gray-800 font-medium">
                 {randomMessage}
               </p>
-              <p className="text-gray-600 mt-3">
+              <p className="text-gray-500 mt-3">
                 Your responses have been submitted successfully. Thank you for your participation and dedication to learning Java programming concepts.
               </p>
             </div>
