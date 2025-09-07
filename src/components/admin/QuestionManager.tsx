@@ -278,7 +278,7 @@ const QuestionManager = () => {
                       size="sm"
                       onClick={() => setFormData({ ...formData, correct_answer: index })}
                     >
-                      {formData.correct_answer === index ? 'âœ“' : `${index + 1}`}
+                      {formData.correct_answer === index ? '✓' : `${index + 1}`}
                     </Button>
                   </div>
                 ))}
