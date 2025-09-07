@@ -1,9 +1,9 @@
-
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Trophy, Clock } from 'lucide-react';
 import { QuizResult } from '../types/quiz';
-import { formatTime, minutesToSeconds, formatCompletionTime } from '@/utils/timeFormat';
+import { formatCompletionTime } from '@/utils/timeFormat';
+import { useRouter } from 'next/router';
 
 interface ResultsScreenProps {
   result: QuizResult;
@@ -12,7 +12,24 @@ interface ResultsScreenProps {
 }
 
 const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
-  const { completionTime } = result;
+  const { completionTime, answers, questions } = result;
+  const router = useRouter();
+
+  // ✅ Prevent going back & redirect to login
+  useEffect(() => {
+    window.history.pushState(null, "", window.location.href);
+    window.onpopstate = function () {
+      router.replace("/login");
+    };
+  }, [router]);
+
+  // ✅ Correct scoring based on index match
+  const score = questions.reduce((acc: number, q: any, i: number) => {
+    if (answers[i] === q.correctAnswer) {
+      return acc + 1;
+    }
+    return acc;
+  }, 0);
 
   const appreciationMessages = [
     "🎉 Congratulations on completing the Java Programming Quiz!",
@@ -49,6 +66,11 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
           </CardHeader>
           
           <CardContent className="space-y-6">
+            {/* Score */}
+            <div className="text-lg font-bold text-quiz-surface-foreground">
+              Your Score: {score}/{questions.length}
+            </div>
+
             {/* Completion Time */}
             <div className="flex justify-center items-center space-x-2 text-muted-foreground">
               <Clock size={16} />
