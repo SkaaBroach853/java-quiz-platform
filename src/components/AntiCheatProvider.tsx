@@ -35,20 +35,12 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
   onAutoSubmit,
 }) => {
   const [isActive, setIsActive] = useState(false);
-  
-  // Separate warning states for different violation types
   const [tabSwitchWarnings, setTabSwitchWarnings] = useState(0);
-  const [fullscreenWarnings, setFullscreenWarnings] = useState(0);
-  
-  // Dialog states
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [showCheatingDialog, setShowCheatingDialog] = useState(false);
-  const [warningMessage, setWarningMessage] = useState('');
-  
-  // Refs for managing state and timers
+  // Remove multiple screen warnings state
+  const [fullscreenWarnings, setFullscreenWarnings] = useState(0);
   const activationTimeRef = useRef<number | null>(null);
-  const isProcessingViolationRef = useRef(false);
-  const autoSubmitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const logCheatingEvent = async (eventType: string, description: string, questionNumber?: number) => {
     try {
@@ -61,68 +53,17 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
         user_agent: navigator.userAgent,
         session_id: `${userEmail}_${Date.now()}`
       });
-      console.log(`Cheating event logged: ${eventType} - ${description}`);
     } catch (error) {
       console.error('Failed to log cheating event:', error);
     }
   };
 
-  const showWarning = (message: string, logType: string, logDescription: string) => {
-    setWarningMessage(message);
-    setShowWarningDialog(true);
-    logCheatingEvent(logType, logDescription, currentQuestionNumber);
-    
-    toast({
-      title: '⚠️ Warning',
-      description: message,
-      variant: 'destructive',
-      duration: 5000,
-    });
-  };
-
   const handleAutoSubmit = (reason: string) => {
-    if (isProcessingViolationRef.current) return;
-    
-    isProcessingViolationRef.current = true;
-    
-    // First show the dialog popup
     setShowCheatingDialog(true);
     logCheatingEvent('auto_submit', reason, currentQuestionNumber);
-    
-    // Force fullscreen mode after showing dialog
-    const forceFullscreen = async () => {
-      try {
-        const el: any = document.documentElement as any;
-        if (!document.fullscreenElement && el.requestFullscreen) {
-          await el.requestFullscreen();
-          console.log('Forced fullscreen for auto-submit');
-        }
-      } catch (error) {
-        console.warn('Could not force fullscreen for auto-submit:', error);
-      }
-    };
-    
-    // Force fullscreen after a brief delay to show the dialog first
     setTimeout(() => {
-      forceFullscreen();
-    }, 500);
-    
-    toast({
-      title: '❌ Quiz Auto-Submitted',
-      description: 'Your quiz has been submitted due to suspicious activity.',
-      variant: 'destructive',
-      duration: 3000,
-    });
-    
-    // Auto-submit after 3 seconds
-    autoSubmitTimeoutRef.current = setTimeout(() => {
       onAutoSubmit();
-    }, 3000);
-  };
-
-  const isWithinGracePeriod = (): boolean => {
-    if (!activationTimeRef.current) return false;
-    return Date.now() - activationTimeRef.current < 3000; // 3 second grace period
+    }, 3000); // Give user 3 seconds to see the warning before auto-submit
   };
 
   // Fullscreen enforcement and monitoring
@@ -130,122 +71,123 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
     if (!isActive) return;
 
     activationTimeRef.current = Date.now();
-
-    // Request fullscreen with a slight delay to avoid immediate violations
-    const requestFullscreenTimer = setTimeout(() => {
-      const el: any = document.documentElement as any;
-      if (!document.fullscreenElement && el.requestFullscreen) {
-        el.requestFullscreen().catch((err: any) => {
-          console.warn('Fullscreen request failed:', err);
-        });
+    
+    // Add a 2-second grace period to prevent immediate triggering
+    setTimeout(() => {
+      if (activationTimeRef.current) {
+        activationTimeRef.current = Date.now();
       }
-    }, 1000);
+    }, 2000);
 
-    const handleFullscreenChange = () => {
-      // Skip if within grace period or already processing a violation
-      if (isWithinGracePeriod() || isProcessingViolationRef.current) return;
-      
-      const isInFullscreen = !!document.fullscreenElement;
-      
-      if (!isInFullscreen && isActive) {
+    const el: any = document.documentElement as any;
+    if (!document.fullscreenElement && el.requestFullscreen) {
+      el.requestFullscreen().catch((err: any) => {
+        console.warn('Fullscreen request failed:', err);
+      });
+    }
+
+    const onFsChange = () => {
+      const inFs = !!document.fullscreenElement;
+      const withinGrace = activationTimeRef.current && Date.now() - (activationTimeRef.current || 0) < 1000;
+      if (!inFs) {
+        if (withinGrace) return;
         if (fullscreenWarnings === 0) {
           setFullscreenWarnings(1);
-          showWarning(
-            'You exited fullscreen mode. Exiting fullscreen again will auto-submit your quiz.',
-            'fullscreen_exit_warning',
-            'User exited fullscreen - first warning'
-          );
+          setShowWarningDialog(true);
+          logCheatingEvent('fullscreen_exit_warning', 'User exited fullscreen - first warning', currentQuestionNumber);
+          toast({
+            title: '⚠️ Warning',
+            description: 'You exited fullscreen. One more attempt will auto-submit your quiz.',
+            variant: 'destructive',
+          });
         } else {
-          handleAutoSubmit('Exited fullscreen mode after receiving warning');
+          handleAutoSubmit('Exited fullscreen after warning');
         }
       }
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    
+    document.addEventListener('fullscreenchange', onFsChange);
     return () => {
-      clearTimeout(requestFullscreenTimer);
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('fullscreenchange', onFsChange);
     };
   }, [isActive, fullscreenWarnings, currentQuestionNumber]);
 
-  // Enhanced Tab switching / Window focus detection
+  // Tab switching / Window blur detection
   useEffect(() => {
     if (!isActive) return;
 
+    const withinGrace = () => {
+      if (!activationTimeRef.current) return false;
+      return Date.now() - activationTimeRef.current < 3000; // 3 second grace period
+    };
+
     const handleVisibilityChange = () => {
-      // Skip if within grace period or already processing a violation
-      if (isWithinGracePeriod() || isProcessingViolationRef.current) return;
-      
+      if (withinGrace()) return;
       if (document.hidden) {
-        console.log('Tab switch detected. Current warnings:', tabSwitchWarnings);
-        
         if (tabSwitchWarnings === 0) {
           setTabSwitchWarnings(1);
-          showWarning(
-            'You switched tabs or left the quiz window. Doing this again will auto-submit your quiz.',
-            'tab_switch_warning',
-            'User switched tabs - first warning'
-          );
+          setShowWarningDialog(true);
+          logCheatingEvent('tab_switch_warning', 'User switched tabs - first warning', currentQuestionNumber);
+          toast({
+            title: '⚠️ Warning',
+            description: 'You switched tabs or tried to leave. One more attempt will auto-submit your quiz.',
+            variant: 'destructive',
+          });
         } else {
-          handleAutoSubmit('User switched tabs after receiving warning');
+          handleAutoSubmit('User switched tabs after warning');
         }
       }
     };
 
-    const handleWindowBlur = () => {
-      // Skip if within grace period or already processing a violation
-      if (isWithinGracePeriod() || isProcessingViolationRef.current) return;
-      
-      // Additional check to avoid false positives from dialog boxes
-      setTimeout(() => {
-        if (!document.hasFocus() && isActive && !isProcessingViolationRef.current) {
-          console.log('Window blur detected. Current warnings:', tabSwitchWarnings);
-          
-          if (tabSwitchWarnings === 0) {
-            setTabSwitchWarnings(1);
-            showWarning(
-              'You left the quiz window. Doing this again will auto-submit your quiz.',
-              'window_blur_warning',
-              'User lost window focus - first warning'
-            );
-          } else {
-            handleAutoSubmit('User lost window focus after receiving warning');
-          }
-        }
-      }, 100);
+    const handleBlur = () => {
+      if (withinGrace()) return;
+      if (tabSwitchWarnings === 0) {
+        setTabSwitchWarnings(1);
+        setShowWarningDialog(true);
+        logCheatingEvent('window_blur_warning', 'User minimized or lost focus - first warning', currentQuestionNumber);
+      } else {
+        handleAutoSubmit('User lost window focus after warning');
+      }
     };
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!isActive || isProcessingViolationRef.current) return;
-      
-      console.log('Before unload detected. Current warnings:', tabSwitchWarnings);
-      
+      if (!isActive) return;
       if (tabSwitchWarnings === 0) {
         setTabSwitchWarnings(1);
+        setShowWarningDialog(true);
         logCheatingEvent('attempt_close_warning', 'User attempted to close or reload - first warning', currentQuestionNumber);
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Leaving will result in auto-submission of your quiz.';
-        return e.returnValue;
       } else {
-        handleAutoSubmit('User attempted to close/reload window after receiving warning');
-        e.preventDefault();
-        e.returnValue = '';
-        return e.returnValue;
+        handleAutoSubmit('Window close or reload after warning');
+      }
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    const handlePageHide = () => {
+      if (withinGrace()) return;
+      if (tabSwitchWarnings === 0) {
+        setTabSwitchWarnings(1);
+        setShowWarningDialog(true);
+        logCheatingEvent('page_hide_warning', 'Page hidden - first warning', currentQuestionNumber);
+      } else {
+        handleAutoSubmit('Page hidden after warning');
       }
     };
 
-    // Add event listeners
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('blur', handleBlur);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('blur', handleBlur);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
     };
   }, [isActive, tabSwitchWarnings, currentQuestionNumber]);
+
+  // Remove multiple screen detection as per user request
 
   // Disable right-click, copy-paste, text selection, keyboard shortcuts
   useEffect(() => {
@@ -280,10 +222,10 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
           e.key.toLowerCase() === 'p' ||
           e.key.toLowerCase() === 'u'
         )
-        || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'C'))
-        || e.key === 'F12'
-        || e.key === 'PrintScreen'
-        || (e.altKey && e.key === 'Tab')
+      || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'C'))
+      || e.key === 'F12'
+      || e.key === 'PrintScreen'
+      || (e.altKey && e.key === 'Tab')
       ) {
         e.preventDefault();
         logCheatingEvent('keyboard_shortcut', `User attempted: ${e.ctrlKey ? 'Ctrl+' : ''}${e.metaKey ? 'Meta+' : ''}${e.shiftKey ? 'Shift+' : ''}${e.altKey ? 'Alt+' : ''}${e.key}`, currentQuestionNumber);
@@ -302,13 +244,11 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
       logCheatingEvent('clipboard_copy', 'User attempted to copy content', currentQuestionNumber);
       toast({ title: '❌ Copy Blocked', description: 'Copy is disabled during the quiz.', variant: 'destructive' });
     };
-
     const handlePaste = (e: ClipboardEvent) => {
       e.preventDefault();
       logCheatingEvent('clipboard_paste', 'User attempted to paste content', currentQuestionNumber);
       toast({ title: '❌ Paste Blocked', description: 'Paste is disabled during the quiz.', variant: 'destructive' });
     };
-
     const handleCut = (e: ClipboardEvent) => {
       e.preventDefault();
       logCheatingEvent('clipboard_cut', 'User attempted to cut content', currentQuestionNumber);
@@ -325,7 +265,6 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
       e.preventDefault();
       return false;
     };
-
     // Add event listeners
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('selectstart', handleSelectStart);
@@ -356,69 +295,34 @@ export const AntiCheatProvider: React.FC<AntiCheatProviderProps> = ({
     };
   }, [isActive, currentQuestionNumber]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (autoSubmitTimeoutRef.current) {
-        clearTimeout(autoSubmitTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Reset processing flag when dialogs close
-  useEffect(() => {
-    if (!showWarningDialog && !showCheatingDialog) {
-      isProcessingViolationRef.current = false;
-    }
-  }, [showWarningDialog, showCheatingDialog]);
-
   return (
     <AntiCheatContext.Provider value={{ isActive, setIsActive, logCheatingEvent }}>
       {children}
       
-      {/* Enhanced Warning Dialog */}
+      {/* Warning Dialog */}
       <AlertDialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-amber-600 flex items-center gap-2">
-              ⚠️ Final Warning
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              {warningMessage}
-              <br /><br />
-              <strong className="text-red-600">
-                This is your only warning. Any further violations will result in automatic submission of your quiz.
-              </strong>
+            <AlertDialogTitle className="text-amber-600">⚠️ Warning</AlertDialogTitle>
+            <AlertDialogDescription>
+              You switched tabs or tried to leave. One more attempt will auto-submit your quiz.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction 
-              onClick={() => setShowWarningDialog(false)}
-              className="bg-amber-600 hover:bg-amber-700"
-            >
-              I Understand - Continue Quiz
+            <AlertDialogAction onClick={() => setShowWarningDialog(false)}>
+              I Understand
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Enhanced Cheating Detected Dialog */}
+      {/* Cheating Detected Dialog */}
       <AlertDialog open={showCheatingDialog} onOpenChange={() => {}}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600 flex items-center gap-2">
-              ❌ Quiz Auto-Submitted
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              Your quiz has been automatically submitted due to suspected cheating behavior.
-              <br /><br />
-              <div className="bg-red-50 p-3 rounded-lg mt-2">
-                <strong>What happened:</strong> You violated the quiz rules after receiving a warning.
-                <br />
-                <strong>Action taken:</strong> Your current answers have been submitted automatically.
-              </div>
-              <br />
-              The page will redirect automatically in a few seconds...
+            <AlertDialogTitle className="text-red-600">⚠️ Cheating Detected!</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your quiz has been auto-submitted due to suspicious activity. The page will redirect automatically.
             </AlertDialogDescription>
           </AlertDialogHeader>
         </AlertDialogContent>
