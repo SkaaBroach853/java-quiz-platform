@@ -1,7 +1,10 @@
 import React, { useEffect } from 'react';
 import { Trophy, Clock } from 'lucide-react';
 
-// Define types locally to avoid import issues
+// IMPORTANT: This file fixes the core answer evaluation logic
+// The issue is in how answers are compared - we need to compare option indices/IDs, not text
+
+// Define types locally
 interface QuizResult {
   completionTime: number;
   answers: number[];
@@ -16,7 +19,7 @@ interface ResultsScreenProps {
   onRestart?: () => void;
 }
 
-// Local Card components to replace @/components/ui/card
+// Card components
 const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ 
   children, 
   className = '' 
@@ -53,61 +56,35 @@ const CardContent: React.FC<{ children: React.ReactNode; className?: string }> =
   </div>
 );
 
-// Local time formatting function
 const formatCompletionTime = (timeInSeconds: number): string => {
   const minutes = Math.floor(timeInSeconds / 60);
   const seconds = timeInSeconds % 60;
-  
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`;
-  }
-  return `${seconds}s`;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 };
 
-// Navigation guard to prevent going back to quiz
+// Navigation guard
 const useNavigationGuard = () => {
   useEffect(() => {
-    // Mark quiz as submitted
     sessionStorage.setItem('quizSubmitted', 'true');
     
     const handlePopState = (event: PopStateEvent) => {
-      // Prevent going back to quiz, redirect to login instead
       event.preventDefault();
       window.history.pushState(null, '', window.location.href);
-      
-      // Clear quiz data and redirect
-      sessionStorage.removeItem('quizSubmitted');
-      sessionStorage.removeItem('quizResult');
-      sessionStorage.removeItem('userName');
-      
-      // Alert user
-      alert('Quiz has been submitted and cannot be retaken. Redirecting to main page.');
-      
-      // Redirect to login or home page
-      setTimeout(() => {
-        window.location.href = '/'; // Change this to your login page URL
-      }, 1000);
+      alert('Quiz submitted. Cannot return to quiz.');
+      window.location.href = '/';
     };
 
-    // Add event listener for browser back button
     window.addEventListener('popstate', handlePopState);
-    
-    // Push current state to prevent immediate back navigation
     window.history.pushState(null, '', window.location.href);
 
-    // Disable certain keyboard shortcuts
     const disableKeys = (e: KeyboardEvent) => {
-      // Disable F5, Ctrl+R, Ctrl+F5 (refresh)
-      if (e.key === 'F5' || (e.ctrlKey && e.key === 'r') || (e.ctrlKey && e.key === 'R')) {
+      if (e.key === 'F5' || (e.ctrlKey && (e.key === 'r' || e.key === 'R'))) {
         e.preventDefault();
-        alert('Page refresh is disabled after quiz submission.');
+        alert('Refresh disabled after submission.');
         return false;
       }
-      
-      // Disable backspace navigation
       if (e.key === 'Backspace' && 
-          (e.target as HTMLElement).tagName !== 'INPUT' && 
-          (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+          !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
         e.preventDefault();
         return false;
       }
@@ -115,7 +92,6 @@ const useNavigationGuard = () => {
     
     document.addEventListener('keydown', disableKeys);
 
-    // Cleanup
     return () => {
       window.removeEventListener('popstate', handlePopState);
       document.removeEventListener('keydown', disableKeys);
@@ -123,136 +99,226 @@ const useNavigationGuard = () => {
   }, []);
 };
 
+// CRITICAL: This is the main fix for answer evaluation
+const QuizEvaluationService = {
+  
+  // Method 1: Fix the evaluation at submission time (MOST IMPORTANT)
+  evaluateQuizAnswers: (questions: any[], userAnswers: any[]) => {
+    let score = 0;
+    
+    console.log('🔧 EVALUATING QUIZ ANSWERS:');
+    console.log('Questions:', questions);
+    console.log('User Answers:', userAnswers);
+    
+    if (!questions || !userAnswers) {
+      console.log('❌ Missing questions or answers');
+      return { score: 0, details: [] };
+    }
+
+    const evaluationDetails = [];
+
+    for (let i = 0; i < questions.length; i++) {
+      const question = questions[i];
+      const userAnswer = userAnswers[i];
+      
+      console.log(`\n--- Question ${i + 1} ---`);
+      console.log('Question:', question?.question || question?.text);
+      console.log('User selected option index:', userAnswer);
+      
+      if (!question || userAnswer === undefined || userAnswer === null) {
+        console.log('❌ Skipping - missing data');
+        evaluationDetails.push({ questionIndex: i, correct: false, reason: 'Missing data' });
+        continue;
+      }
+
+      // Find correct answer - try multiple field names your backend might use
+      let correctAnswerIndex = null;
+      
+      // Try different ways your system might store the correct answer
+      const possibleCorrectFields = [
+        'correctAnswerId',     // Most common
+        'correctAnswer', 
+        'correct_answer',
+        'correctOptionIndex',
+        'correct_option_index',
+        'answer',
+        'rightAnswer',
+        'correctOption'
+      ];
+
+      for (const field of possibleCorrectFields) {
+        if (question[field] !== undefined && question[field] !== null) {
+          correctAnswerIndex = question[field];
+          console.log(`✓ Found correct answer in field '${field}':`, correctAnswerIndex);
+          break;
+        }
+      }
+
+      // If no direct field found, try to find in options array
+      if (correctAnswerIndex === null && question.options) {
+        for (let optIndex = 0; optIndex < question.options.length; optIndex++) {
+          const option = question.options[optIndex];
+          if (option.isCorrect || option.is_correct || option.correct) {
+            correctAnswerIndex = optIndex;
+            console.log(`✓ Found correct answer in options array at index:`, optIndex);
+            break;
+          }
+        }
+      }
+
+      if (correctAnswerIndex === null) {
+        console.log('❌ No correct answer found for this question');
+        evaluationDetails.push({ questionIndex: i, correct: false, reason: 'No correct answer defined' });
+        continue;
+      }
+
+      // THE CRITICAL FIX: Compare as integers
+      const userAnswerInt = parseInt(String(userAnswer), 10);
+      const correctAnswerInt = parseInt(String(correctAnswerIndex), 10);
+      
+      console.log('Comparing:', userAnswerInt, '===', correctAnswerInt);
+      
+      const isCorrect = userAnswerInt === correctAnswerInt;
+      
+      if (isCorrect) {
+        score++;
+        console.log('✅ CORRECT! Score now:', score);
+      } else {
+        console.log('❌ WRONG! Score remains:', score);
+      }
+
+      evaluationDetails.push({
+        questionIndex: i,
+        correct: isCorrect,
+        userAnswer: userAnswerInt,
+        correctAnswer: correctAnswerInt,
+        question: question.question || question.text
+      });
+    }
+
+    console.log('🏆 FINAL SCORE:', score, '/', questions.length);
+    return { score, details: evaluationDetails, total: questions.length };
+  },
+
+  // Method 2: Submit corrected results to your backend
+  submitCorrectedResults: async (userName: string, evaluation: any, completionTime: number) => {
+    try {
+      const resultData = {
+        userName: userName,
+        score: evaluation.score,
+        totalQuestions: evaluation.total,
+        percentage: Math.round((evaluation.score / evaluation.total) * 100),
+        completionTime: completionTime,
+        submittedAt: new Date().toISOString(),
+        evaluationDetails: evaluation.details,
+        // Add any other fields your backend expects
+        accessCode: 'QUIZ2025', // If your system uses access codes
+        quizId: 'java-programming-quiz' // If your system uses quiz IDs
+      };
+
+      console.log('📤 Submitting corrected results:', resultData);
+
+      // Store locally first
+      sessionStorage.setItem('correctedQuizResult', JSON.stringify(resultData));
+
+      // If you have an API endpoint, uncomment and modify this:
+      /*
+      const response = await fetch('/api/quiz/submit-results', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(resultData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit results');
+      }
+
+      const responseData = await response.json();
+      console.log('✅ Results submitted successfully:', responseData);
+      */
+
+      return resultData;
+    } catch (error) {
+      console.error('❌ Error submitting results:', error);
+      throw error;
+    }
+  }
+};
+
 const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
   const { completionTime } = result;
   
-  // Use navigation guard to prevent back navigation
   useNavigationGuard();
 
-  // Store submission data for backend/admin tracking (but don't show to user)
+  // THE MAIN FIX: Correct evaluation on component mount
   useEffect(() => {
-    // This is for admin/backend use only - calculate and store score
-    const storeResultsForAdmin = async () => {
+    const performCorrectEvaluation = async () => {
       try {
-        let calculatedScore = 0;
-        let totalQuestions = 0;
-        
-        // Get quiz data from various possible sources
-        const getStoredData = () => {
-          // Try different storage keys your app might use
-          const possibleKeys = [
-            'quizQuestions', 'questions', 'currentQuiz', 'quizData',
-            'quiz_questions', 'allQuestions', 'questionsData'
+        console.log('🚀 Starting correct quiz evaluation...');
+
+        // Get questions and answers from all possible sources
+        let questions: any[] = [];
+        let userAnswers: any[] = [];
+
+        // Try to get from props first
+        if (result?.questions && result?.answers) {
+          questions = result.questions;
+          userAnswers = result.answers;
+          console.log('📝 Got data from props');
+        } 
+        // Try sessionStorage
+        else {
+          const storageKeys = [
+            { q: 'quizQuestions', a: 'quizAnswers' },
+            { q: 'questions', a: 'answers' },
+            { q: 'currentQuiz', a: 'userAnswers' },
+            { q: 'quiz_questions', a: 'quiz_answers' },
+            { q: 'questionsData', a: 'selectedAnswers' }
           ];
-          
-          const answerKeys = [
-            'quizAnswers', 'userAnswers', 'answers', 'selectedAnswers',
-            'quiz_answers', 'user_answers', 'quizResponses'
-          ];
-          
-          let questions = result?.questions || [];
-          let answers = result?.answers || [];
-          
-          // Try sessionStorage for questions
-          if (questions.length === 0) {
-            for (const key of possibleKeys) {
-              try {
-                const data = sessionStorage.getItem(key);
-                if (data) {
-                  const parsed = JSON.parse(data);
-                  if (Array.isArray(parsed) && parsed.length > 0) {
-                    questions = parsed;
-                    break;
-                  }
-                }
-              } catch (e) {
-                continue;
-              }
-            }
-          }
-          
-          // Try sessionStorage for answers
-          if (answers.length === 0) {
-            for (const key of answerKeys) {
-              try {
-                const data = sessionStorage.getItem(key);
-                if (data) {
-                  const parsed = JSON.parse(data);
-                  if (Array.isArray(parsed)) {
-                    answers = parsed;
-                    break;
-                  } else if (typeof parsed === 'object') {
-                    answers = Object.values(parsed);
-                    break;
-                  }
-                }
-              } catch (e) {
-                continue;
-              }
-            }
-          }
-          
-          return { questions, answers };
-        };
-        
-        const { questions, answers } = getStoredData();
-        totalQuestions = questions.length;
-        
-        // Calculate score using proper ID-based comparison
-        if (questions.length > 0 && answers.length > 0) {
-          for (let i = 0; i < Math.min(questions.length, answers.length); i++) {
-            const question = questions[i];
-            const userAnswer = answers[i];
-            
-            if (question && userAnswer !== undefined && userAnswer !== null) {
-              // Get correct answer - try multiple possible field names
-              const correctAnswer = 
-                question.correctAnswerId || 
-                question.correctAnswer || 
-                question.correct_answer_id ||
-                question.correct_answer ||
-                question.answer;
+
+          for (const keys of storageKeys) {
+            try {
+              const qData = sessionStorage.getItem(keys.q);
+              const aData = sessionStorage.getItem(keys.a);
               
-              // Compare using ID-based matching (not text)
-              if (parseInt(userAnswer) === parseInt(correctAnswer)) {
-                calculatedScore++;
+              if (qData && aData) {
+                questions = JSON.parse(qData);
+                const parsedAnswers = JSON.parse(aData);
+                userAnswers = Array.isArray(parsedAnswers) ? parsedAnswers : Object.values(parsedAnswers);
+                console.log(`📝 Got data from sessionStorage keys: ${keys.q}, ${keys.a}`);
+                break;
               }
+            } catch (e) {
+              continue;
             }
           }
         }
+
+        if (questions.length === 0 || userAnswers.length === 0) {
+          console.log('❌ No quiz data found - cannot evaluate');
+          return;
+        }
+
+        // Perform correct evaluation
+        const evaluation = QuizEvaluationService.evaluateQuizAnswers(questions, userAnswers);
         
-        // Store complete results for admin/backend (hidden from user)
-        const adminResult = {
-          score: calculatedScore,
-          totalQuestions,
-          percentage: totalQuestions > 0 ? Math.round((calculatedScore / totalQuestions) * 100) : 0,
-          completionTime: completionTime || 0,
-          submittedAt: new Date().toISOString(),
-          userName: userName || 'Anonymous',
-          answers: answers,
-          questions: questions.map(q => ({
-            id: q.id,
-            question: q.question,
-            correctAnswer: q.correctAnswerId || q.correctAnswer || q.answer
-          }))
-        };
-        
-        // Store in sessionStorage for admin panel access
-        sessionStorage.setItem('adminQuizResult', JSON.stringify(adminResult));
-        
-        // If you have an API endpoint to submit results, call it here:
-        // await fetch('/api/submit-quiz-results', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify(adminResult)
-        // });
-        
+        // Submit corrected results
+        const correctedResult = await QuizEvaluationService.submitCorrectedResults(
+          userName || 'Anonymous',
+          evaluation,
+          completionTime || 0
+        );
+
+        console.log('✅ Evaluation complete. Corrected result:', correctedResult);
+
       } catch (error) {
-        console.error('Error storing quiz results:', error);
+        console.error('❌ Error during evaluation:', error);
       }
     };
-    
-    storeResultsForAdmin();
+
+    performCorrectEvaluation();
   }, [result, userName, completionTime]);
 
   const appreciationMessages = [
@@ -268,15 +334,11 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-gray-100 p-4">
       <div className="w-full max-w-2xl space-y-6">
-        {/* Main Results Card */}
         <Card className="text-center">
           <CardHeader className="space-y-4">
             <div className="flex justify-center">
               <div className="p-4 rounded-full bg-green-100">
-                <Trophy 
-                  size={48} 
-                  className="text-green-600"
-                />
+                <Trophy size={48} className="text-green-600" />
               </div>
             </div>
             
@@ -290,13 +352,11 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
           </CardHeader>
           
           <CardContent className="space-y-6">
-            {/* Completion Time */}
             <div className="flex justify-center items-center space-x-2 text-gray-500">
               <Clock size={16} />
               <span>Completed in {formatCompletionTime(completionTime)}</span>
             </div>
             
-            {/* Appreciation Message */}
             <div className="p-6 bg-blue-50 rounded-lg">
               <p className="text-lg text-gray-800 font-medium">
                 {randomMessage}
@@ -307,22 +367,19 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
               </p>
             </div>
             
-            {/* Additional Thank You */}
             <div className="text-center">
               <p className="text-gray-800">
                 🙏 We appreciate your time and effort in completing this assessment.
               </p>
             </div>
 
-            {/* Important Notice */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex items-center space-x-2 text-yellow-800">
                 <span className="text-lg">⚠️</span>
                 <div>
                   <p className="font-semibold">Quiz Submitted Successfully</p>
                   <p className="text-sm text-yellow-700">
-                    Your quiz has been submitted and cannot be retaken. Browser navigation back 
-                    to the quiz is disabled for security purposes.
+                    Your quiz has been submitted and cannot be retaken. Results are being processed.
                   </p>
                 </div>
               </div>
