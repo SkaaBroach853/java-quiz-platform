@@ -5,7 +5,7 @@ import { Trophy, Clock } from 'lucide-react';
 interface QuizResult {
   completionTime: number;
   answers: number[];
-  questions: any[];
+  questions?: any[];
   score?: number;
   totalQuestions?: number;
 }
@@ -53,7 +53,7 @@ const CardContent: React.FC<{ children: React.ReactNode; className?: string }> =
   </div>
 );
 
-// Local time formatting function to replace @/utils/timeFormat
+// Local time formatting function
 const formatCompletionTime = (timeInSeconds: number): string => {
   const minutes = Math.floor(timeInSeconds / 60);
   const seconds = timeInSeconds % 60;
@@ -64,63 +64,179 @@ const formatCompletionTime = (timeInSeconds: number): string => {
   return `${seconds}s`;
 };
 
-// Navigation guard to prevent going back to quiz
+// Enhanced navigation guard with stronger protection
 const useNavigationGuard = () => {
   useEffect(() => {
-    // Mark quiz as submitted
+    // Mark quiz as submitted immediately
     sessionStorage.setItem('quizSubmitted', 'true');
+    sessionStorage.setItem('quizCompletedAt', new Date().toISOString());
+    
+    // Disable browser back button
+    const preventBack = () => {
+      window.history.forward();
+    };
     
     const handlePopState = (event: PopStateEvent) => {
-      // Prevent going back to quiz, redirect to login instead
+      // Always prevent going back
       event.preventDefault();
+      event.stopPropagation();
+      
+      // Force forward navigation
       window.history.pushState(null, '', window.location.href);
       
-      // Optional: Clear quiz data and redirect to login
-      sessionStorage.removeItem('quizSubmitted');
-      sessionStorage.removeItem('quizResult');
-      sessionStorage.removeItem('userName');
+      // Show alert to user
+      alert('Quiz has been submitted. You cannot go back to retake the quiz. Please use the application navigation.');
       
-      // If you have a router, redirect to login page
-      // For example with React Router: navigate('/login');
-      // For now, we'll reload to reset the application state
-      window.location.href = '/login'; // Adjust path as needed
+      // Optional: Clear all quiz data
+      sessionStorage.removeItem('currentQuiz');
+      sessionStorage.removeItem('quizAnswers');
+      sessionStorage.removeItem('quizStartTime');
+      
+      return false;
     };
 
-    // Add event listener for browser back button
+    // Multiple layers of protection
     window.addEventListener('popstate', handlePopState);
+    window.addEventListener('beforeunload', preventBack);
     
-    // Push current state to prevent immediate back navigation
-    window.history.pushState(null, '', window.location.href);
+    // Push multiple states to make back harder
+    for (let i = 0; i < 3; i++) {
+      window.history.pushState(null, '', window.location.href);
+    }
+    
+    // Disable right-click context menu
+    const disableRightClick = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
+    
+    document.addEventListener('contextmenu', disableRightClick);
+    
+    // Disable certain keyboard shortcuts
+    const disableKeys = (e: KeyboardEvent) => {
+      // Disable F5, Ctrl+R, Ctrl+F5 (refresh)
+      if (e.key === 'F5' || (e.ctrlKey && e.key === 'r') || (e.ctrlKey && e.key === 'R')) {
+        e.preventDefault();
+        e.stopPropagation();
+        alert('Page refresh is disabled after quiz submission.');
+        return false;
+      }
+      
+      // Disable backspace navigation
+      if (e.key === 'Backspace' && (e.target as HTMLElement).tagName !== 'INPUT' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        return false;
+      }
+    };
+    
+    document.addEventListener('keydown', disableKeys);
 
     // Cleanup
     return () => {
       window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('beforeunload', preventBack);
+      document.removeEventListener('contextmenu', disableRightClick);
+      document.removeEventListener('keydown', disableKeys);
     };
   }, []);
 };
 
 const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
-  const { completionTime, score, totalQuestions, questions } = result;
-  
-  // Use navigation guard to prevent back navigation
+  // Use enhanced navigation guard
   useNavigationGuard();
 
-  // Calculate score if not provided (using fixed evaluation logic)
-  const calculatedScore = score !== undefined ? score : (() => {
-    if (!result.answers || !questions) return 0;
+  // Get quiz data from various sources
+  const getQuizData = () => {
+    // Try to get from props first
+    if (result?.questions && result.answers) {
+      return {
+        questions: result.questions,
+        answers: result.answers,
+        totalQuestions: result.questions.length
+      };
+    }
     
-    return result.answers.reduce((total, userAnswerId, index) => {
-      const question = questions[index];
-      if (!question) return total;
+    // Try to get from sessionStorage
+    try {
+      const storedQuestions = sessionStorage.getItem('quizQuestions');
+      const storedAnswers = sessionStorage.getItem('quizAnswers') || sessionStorage.getItem('userAnswers');
       
-      // Use ID-based comparison instead of text comparison
-      const correctAnswerId = question.correctAnswerId || question.correctAnswer;
-      return total + (userAnswerId === correctAnswerId ? 1 : 0);
-    }, 0);
-  })();
+      if (storedQuestions && storedAnswers) {
+        const questions = JSON.parse(storedQuestions);
+        const answers = JSON.parse(storedAnswers);
+        
+        return {
+          questions,
+          answers: Array.isArray(answers) ? answers : Object.values(answers),
+          totalQuestions: questions.length
+        };
+      }
+    } catch (error) {
+      console.error('Error parsing stored quiz data:', error);
+    }
+    
+    // Fallback: assume some default values
+    return {
+      questions: [],
+      answers: result?.answers || [],
+      totalQuestions: result?.totalQuestions || result?.answers?.length || 0
+    };
+  };
 
-  const totalQs = totalQuestions || questions?.length || result.answers?.length || 0;
+  const { questions, answers, totalQuestions } = getQuizData();
+
+  // Calculate score with proper ID-based evaluation
+  const calculateScore = () => {
+    if (result?.score !== undefined) {
+      return result.score;
+    }
+    
+    if (!questions || !answers || questions.length === 0) {
+      return 0;
+    }
+    
+    let score = 0;
+    
+    for (let i = 0; i < Math.min(questions.length, answers.length); i++) {
+      const question = questions[i];
+      const userAnswer = answers[i];
+      
+      if (!question) continue;
+      
+      // Multiple ways to check correct answer
+      const correctAnswer = question.correctAnswerId || 
+                           question.correctAnswer || 
+                           question.correct_answer_id || 
+                           question.answer;
+      
+      // Compare using various methods
+      if (userAnswer === correctAnswer || 
+          parseInt(userAnswer) === parseInt(correctAnswer) ||
+          userAnswer === question.options?.findIndex(opt => opt.isCorrect)) {
+        score++;
+      }
+    }
+    
+    return score;
+  };
+
+  const calculatedScore = calculateScore();
+  const totalQs = totalQuestions || questions?.length || 0;
   const percentage = totalQs > 0 ? Math.round((calculatedScore / totalQs) * 100) : 0;
+  
+  // Store final results
+  useEffect(() => {
+    const finalResult = {
+      score: calculatedScore,
+      totalQuestions: totalQs,
+      percentage,
+      completionTime: result?.completionTime || 0,
+      submittedAt: new Date().toISOString(),
+      userName: userName || 'Anonymous'
+    };
+    
+    sessionStorage.setItem('finalQuizResult', JSON.stringify(finalResult));
+  }, [calculatedScore, totalQs, percentage, result?.completionTime, userName]);
 
   const appreciationMessages = [
     "🎉 Congratulations on completing the Java Programming Quiz!",
@@ -157,28 +273,12 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
           </CardHeader>
           
           <CardContent className="space-y-6">
-            {/* Score Display */}
-            <div className="space-y-2">
-              <div className="text-3xl font-bold text-gray-800">
-                {calculatedScore}/{totalQs}
-              </div>
-              <div className="text-lg text-gray-600">
-                Score: {percentage}%
-              </div>
-              <div className={`inline-block px-4 py-2 rounded-full text-sm font-medium ${
-                percentage >= 80 ? 'bg-green-100 text-green-800' :
-                percentage >= 60 ? 'bg-yellow-100 text-yellow-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {percentage >= 80 ? 'Excellent!' : 
-                 percentage >= 60 ? 'Good Job!' : 'Keep Learning!'}
-              </div>
-            </div>
+            {/* No Score Display - Hidden from user */}
 
             {/* Completion Time */}
             <div className="flex justify-center items-center space-x-2 text-gray-500">
               <Clock size={16} />
-              <span>Completed in {formatCompletionTime(completionTime)}</span>
+              <span>Completed in {formatCompletionTime(result?.completionTime || 0)}</span>
             </div>
             
             {/* Appreciation Message */}
@@ -199,13 +299,31 @@ const ResultsScreen: React.FC<ResultsScreenProps> = ({ result, userName }) => {
               </p>
             </div>
 
-            {/* Navigation Note */}
-            <div className="text-sm text-gray-500 bg-gray-50 p-4 rounded-lg">
-              <p>
-                📝 <strong>Note:</strong> Your quiz has been submitted and cannot be retaken. 
-                Use the browser's navigation to return to the main application.
-              </p>
+            {/* Strong Navigation Warning */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-center space-x-2 text-yellow-800">
+                <span className="text-lg">⚠️</span>
+                <div>
+                  <p className="font-semibold">Quiz Submitted Successfully</p>
+                  <p className="text-sm text-yellow-700">
+                    Your quiz has been submitted and cannot be retaken. Browser navigation back 
+                    to the quiz is disabled for security purposes.
+                  </p>
+                </div>
+              </div>
             </div>
+
+            {/* Debug Info (remove in production) */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="bg-gray-100 p-4 rounded text-xs text-left">
+                <p><strong>Debug Info:</strong></p>
+                <p>Calculated Score: {calculatedScore}</p>
+                <p>Total Questions: {totalQs}</p>
+                <p>Percentage: {percentage}%</p>
+                <p>Answers: {JSON.stringify(answers)}</p>
+                <p>Has Questions: {questions?.length > 0 ? 'Yes' : 'No'}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
