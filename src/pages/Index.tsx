@@ -184,36 +184,65 @@ const Index = () => {
   };
 
   const handleNextQuestion = async () => {
-    if (!questions) return;
+  if (!questions) return;
 
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      // Quiz is complete, calculate the result
-      const totalQuestions = questions.length;
-      const correctAnswers = questions.reduce((count, question, index) => {
-        return answers[index] === question.correctAnswer ? count + 1 : count;
-      }, 0);
+  if (currentQuestionIndex < questions.length - 1) {
+    setCurrentQuestionIndex(currentQuestionIndex + 1);
+  } else {
+    // ADD THIS DEBUG CODE TO SEE WHAT'S HAPPENING
+    console.log("=== QUIZ SCORING DEBUG ===");
+    console.log("Total questions:", questions.length);
+    console.log("User answers:", answers);
+    
+    let correctCount = 0;
+    questions.forEach((question, index) => {
+      const userAnswer = answers[index];
+      const correctAnswer = question.correctAnswer;
+      const isCorrect = userAnswer === correctAnswer;
+      
+      if (isCorrect) correctCount++;
+      
+      console.log(`Question ${index + 1}:`);
+      console.log(`  Question: ${question.question}`);
+      console.log(`  Options: ${question.options}`);
+      console.log(`  User selected index: ${userAnswer} (${userAnswer !== null ? question.options[userAnswer] : 'No answer'})`);
+      console.log(`  Correct answer index: ${correctAnswer} (${question.options[correctAnswer]})`);
+      console.log(`  Is correct: ${isCorrect}`);
+      console.log("---");
+    });
+    
+    console.log(`Total correct: ${correctCount} out of ${questions.length}`);
+    console.log("=== END DEBUG ===");
 
-      const sectionScores = questions.reduce((scores, question, index) => {
-        if (answers[index] === question.correctAnswer) {
-          scores[`section${question.section}` as keyof typeof scores] += 1;
-        }
-        return scores;
-      }, { section1: 0, section2: 0, section3: 0 });
+    // Quiz is complete, calculate the result
+    const totalQuestions = questions.length;
+    const correctAnswers = questions.reduce((count, question, index) => {
+      return answers[index] === question.correctAnswer ? count + 1 : count;
+    }, 0);
 
-      // Calculate actual elapsed time in seconds
-      const completionTimeInSeconds = Math.max(1, Math.round(((Date.now() - (quizStartTime || Date.now())) / 1000)));
+    const sectionScores = questions.reduce((scores, question, index) => {
+      if (answers[index] === question.correctAnswer) {
+        scores[`section${question.section}` as keyof typeof scores] += 1;
+      }
+      return scores;
+    }, { section1: 0, section2: 0, section3: 0 });
 
-      const quizResult = {
-        totalScore: correctAnswers,
-        sectionScores,
-        completionTime: completionTimeInSeconds, // Store as seconds
-        completedAt: new Date()
-      };
+    // Calculate actual elapsed time in seconds
+    const completionTimeInSeconds = Math.max(1, Math.round(((Date.now() - (quizStartTime || Date.now())) / 1000)));
 
-      setResult(quizResult);
-      setIsCompleted(true);
+    const quizResult = {
+      totalScore: correctAnswers,
+      sectionScores,
+      completionTime: completionTimeInSeconds,
+      completedAt: new Date()
+    };
+
+    setResult(quizResult);
+    setIsCompleted(true);
+
+    // Rest of your existing code for saving to database...
+  }
+};
 
       // Save result to Supabase with enhanced error handling
       try {
