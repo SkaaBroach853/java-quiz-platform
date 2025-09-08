@@ -75,6 +75,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
           </CardTitle>
           <p className="text-muted-foreground">
             Enter your credentials to begin the assessment
+            Computer science Engineering- IoT CSBC Department 
+            IoTECH presents - TechnicalQuiz
           </p>
         </CardHeader>
         
