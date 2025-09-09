@@ -27,15 +27,17 @@ const QuizRulesModal = ({ isOpen, onClose, onStartQuiz }: QuizRulesModalProps) =
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-blue-600" />
-                <span><strong>Section I →</strong> 15 Questions (Basics), 15 sec per question</span>
+                <span><strong>Type I →</strong> 15 Questions (Basics)</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-blue-600" />
-                <span><strong>Section II →</strong> 15 Questions (Mixed Programming MCQs), 15 sec per question</span>
+                <span><strong>Type II →</strong> 15 Questions (Mixed Programming MCQs)</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-red-600" />
-                <span><strong>Section III →</strong> 15 Questions (Programming-only MCQs), 10 sec per question</span>
+                <span><strong>Type III →</strong> 10 Questions (Programming-only MCQs)</span>
+                <Clock className="h-4 w-4 text-red-600" />
+                <span><strong>Time limit: 35 minutes </strong>All the questions are Objective-type questions. Difficulty level Easy to Complex</span>
               </div>
             </div>
           </div>
@@ -44,14 +46,14 @@ const QuizRulesModal = ({ isOpen, onClose, onStartQuiz }: QuizRulesModalProps) =
             <div className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
               <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
               <p className="text-sm text-gray-800">
-                Each question must be answered within the time limit — unanswered questions will be marked as wrong.
+                Solve all question within the time limit — unanswered questions will be unmarked and Submitted.
               </p>
             </div>
 
             <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
               <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
               <p className="text-sm text-gray-800">
-                Once a section is completed, you cannot return to it.
+                Once a question is submitted, you cannot return to it.
               </p>
             </div>
 
