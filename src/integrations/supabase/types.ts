@@ -301,14 +301,8 @@ export type Database = {
       }
     }
     Functions: {
-      cleanup_inactive_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      complete_quiz_session: {
-        Args: { p_user_id: string }
-        Returns: boolean
-      }
+      cleanup_inactive_sessions: { Args: never; Returns: undefined }
+      complete_quiz_session: { Args: { p_user_id: string }; Returns: boolean }
       get_user_by_access_code: {
         Args: { p_access_code: string }
         Returns: {
