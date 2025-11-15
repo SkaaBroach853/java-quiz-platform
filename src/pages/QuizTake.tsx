@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AntiCheatProvider } from '@/components/AntiCheatProvider';
 import QuizWrapper from '@/components/QuizWrapper';
 import ResultsScreen from '@/components/ResultsScreen';
+import BreathingCursor from '@/components/BreathingCursor';
 import { Question } from '@/types/quiz';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -230,6 +231,7 @@ const QuizTake = () => {
       onAutoSubmit={handleAutoSubmit}
     >
       <div className="min-h-screen bg-background">
+        <BreathingCursor />
         <QuizWrapper
           question={currentQuestion}
           questionNumber={currentQuestionIndex + 1}
