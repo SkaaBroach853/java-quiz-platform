@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,9 +32,19 @@ interface Question {
   difficulty: 'easy' | 'moderate' | 'hard';
   time_limit: number;
   image_url?: string;
+  quiz_id: string | null;
 }
 
-const QuestionManager = () => {
+interface QuizOption {
+  id: string;
+  name: string;
+}
+
+interface QuestionManagerProps {
+  initialQuizId?: string | null;
+}
+
+const QuestionManager = ({ initialQuizId = null }: QuestionManagerProps) => {
   const [isAddingQuestion, setIsAddingQuestion] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [formData, setFormData] = useState({
@@ -44,12 +54,32 @@ const QuestionManager = () => {
     section: 1 as 1 | 2 | 3,
     difficulty: 'easy' as 'easy' | 'moderate' | 'hard',
     time_limit: 15,
-    image_url: ''
+    image_url: '',
+    quiz_id: initialQuizId || ''
   });
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (initialQuizId) {
+      setFormData((current) => ({ ...current, quiz_id: initialQuizId }));
+    }
+  }, [initialQuizId]);
+
+  const { data: quizzes = [] } = useQuery({
+    queryKey: ['quizzes-for-questions'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('quizzes')
+        .select('id, name')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data as QuizOption[];
+    },
+  });
 
   // Fetch questions
   const { data: questions = [], isLoading } = useQuery({
@@ -105,6 +135,7 @@ const QuestionManager = () => {
             difficulty: questionData.difficulty,
             time_limit: questionData.time_limit,
             image_url: imageUrl,
+            quiz_id: questionData.quiz_id,
             updated_at: new Date().toISOString()
           })
           .eq('id', editingQuestion.id);
@@ -122,7 +153,8 @@ const QuestionManager = () => {
             section: questionData.section,
             difficulty: questionData.difficulty,
             time_limit: questionData.time_limit,
-            image_url: imageUrl
+            image_url: imageUrl,
+            quiz_id: questionData.quiz_id
           });
         if (error) {
           console.error('Insert error:', error);
@@ -141,7 +173,7 @@ const QuestionManager = () => {
     onError: (error) => {
       toast({
         title: "Error",
-        description: "Failed to save question. Please try again.",
+      description: error instanceof Error ? error.message : "Failed to save question. Please try again.",
         variant: "destructive"
       });
       console.error('Save error:', error);
@@ -185,7 +217,8 @@ const QuestionManager = () => {
       section: 1,
       difficulty: 'easy',
       time_limit: 15,
-      image_url: ''
+      image_url: '',
+      quiz_id: initialQuizId || ''
     });
     setSelectedImage(null);
     setIsAddingQuestion(false);
@@ -200,7 +233,8 @@ const QuestionManager = () => {
       section: question.section,
       difficulty: question.difficulty,
       time_limit: question.time_limit,
-      image_url: question.image_url || ''
+      image_url: question.image_url || '',
+      quiz_id: question.quiz_id || ''
     });
     setEditingQuestion(question);
     setIsAddingQuestion(true);
@@ -218,6 +252,23 @@ const QuestionManager = () => {
     const newOptions = [...formData.options];
     newOptions[index] = value;
     setFormData({ ...formData, options: newOptions });
+  };
+
+  const handleSave = () => {
+    const hasBlankOption = formData.options.some((option) => !option.trim());
+    if (!formData.quiz_id || !formData.question.trim() || hasBlankOption) {
+      toast({
+        title: 'Complete the question first',
+        description: 'Choose a quiz, enter a question, and fill in all four options.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    saveMutation.mutate({
+      ...formData,
+      question: formData.question.trim(),
+      options: formData.options.map((option) => option.trim()),
+    });
   };
 
   if (isLoading) {
@@ -250,6 +301,25 @@ const QuestionManager = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="quiz">Quiz</Label>
+              <Select
+                value={formData.quiz_id}
+                onValueChange={(value) => setFormData({ ...formData, quiz_id: value })}
+              >
+                <SelectTrigger id="quiz" className="mt-1">
+                  <SelectValue placeholder="Choose the quiz for this question" />
+                </SelectTrigger>
+                <SelectContent>
+                  {quizzes.map((quiz) => (
+                    <SelectItem key={quiz.id} value={quiz.id}>{quiz.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {quizzes.length === 0 && (
+                <p className="mt-1 text-xs text-destructive">Create a quiz before adding questions.</p>
+              )}
+            </div>
             <div>
               <Label htmlFor="question">Question</Label>
               <Textarea
@@ -365,8 +435,8 @@ const QuestionManager = () => {
 
             <div className="flex gap-2 pt-4">
               <Button 
-                onClick={() => saveMutation.mutate(formData)}
-                disabled={saveMutation.isPending}
+                onClick={handleSave}
+                disabled={saveMutation.isPending || quizzes.length === 0}
               >
                 {saveMutation.isPending ? 'Saving...' : (editingQuestion ? 'Update' : 'Add')} Question
               </Button>

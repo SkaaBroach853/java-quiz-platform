@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,48 +9,22 @@ import LiveTracking from '@/components/admin/LiveTracking';
 import ResultsOverview from '@/components/admin/ResultsOverview';
 import Leaderboard from '@/components/admin/Leaderboard';
 import DataManagement from '@/components/admin/DataManagement';
-import AdminAuth from '@/components/AdminAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { Users, FileQuestion, BarChart3, Trophy, Settings, LogOut } from 'lucide-react';
 
 const Admin = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [adminUser, setAdminUser] = useState<string>('');
+  const { user, userRole, loading, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectedQuizId = searchParams.get('quiz');
 
-  // Check if admin is already logged in (from localStorage)
-  useEffect(() => {
-    const savedAuth = localStorage.getItem('admin_auth');
-    if (savedAuth) {
-      const { username, timestamp } = JSON.parse(savedAuth);
-      // Check if session is less than 24 hours old
-      const isValid = Date.now() - timestamp < 24 * 60 * 60 * 1000;
-      if (isValid) {
-        setIsAuthenticated(true);
-        setAdminUser(username);
-      } else {
-        localStorage.removeItem('admin_auth');
-      }
+  React.useEffect(() => {
+    if (!loading && (!user || userRole !== 'admin')) {
+      navigate('/auth', { replace: true });
     }
-  }, []);
+  }, [loading, navigate, user, userRole]);
 
-  const handleLogin = (username: string, password: string) => {
-    setIsAuthenticated(true);
-    setAdminUser(username);
-    // Save auth state to localStorage
-    localStorage.setItem('admin_auth', JSON.stringify({
-      username,
-      timestamp: Date.now()
-    }));
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setAdminUser('');
-    localStorage.removeItem('admin_auth');
-  };
-
-  if (!isAuthenticated) {
-    return <AdminAuth onLogin={handleLogin} />;
-  }
+  if (loading || !user || userRole !== 'admin') return null;
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -58,11 +33,11 @@ const Admin = () => {
           <div>
             <h1 className="text-3xl font-bold text-foreground">QuizPlat Admin Dashboard</h1>
             <p className="text-muted-foreground mt-2">
-              Welcome back, {adminUser}! Manage questions, track live sessions, and view results
+              Welcome back! Manage questions, track live sessions, and view results
             </p>
           </div>
           <Button 
-            onClick={handleLogout}
+            onClick={signOut}
             variant="outline"
             className="flex items-center gap-2"
           >
@@ -104,7 +79,7 @@ const Admin = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <QuestionManager />
+                <QuestionManager initialQuizId={selectedQuizId} />
               </CardContent>
             </Card>
           </TabsContent>

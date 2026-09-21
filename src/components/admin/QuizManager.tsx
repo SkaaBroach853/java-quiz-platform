@@ -92,7 +92,7 @@ const QuizManager = () => {
   };
 
   const manageQuestions = (quiz: Quiz) => {
-    window.location.href = `/admin#quiz-${quiz.id}`;
+    window.location.href = `/admin?quiz=${quiz.id}`;
   };
 
   return (
