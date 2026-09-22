@@ -32,41 +32,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
 
   const fetchUserRole = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .single();
+    const { data: isAdmin, error: adminError } = await supabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin',
+    });
 
-    if (!error && data) {
-      setUserRole(data.role as 'admin' | 'student');
+    if (!adminError && isAdmin) {
+      setUserRole('admin');
+      return 'admin';
     }
+
+    const { data: isStudent, error: studentError } = await supabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'student',
+    });
+
+    if (!studentError && isStudent) {
+      setUserRole('student');
+      return 'student';
+    }
+
+    setUserRole(null);
+    return null;
   };
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
+        setLoading(true);
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Fetch user role after state is set
         if (session?.user) {
-          setTimeout(() => {
-            fetchUserRole(session.user.id);
-          }, 0);
+          await fetchUserRole(session.user.id);
         } else {
           setUserRole(null);
         }
+
+        setLoading(false);
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchUserRole(session.user.id);
+        await fetchUserRole(session.user.id);
+      } else {
+        setUserRole(null);
       }
       setLoading(false);
     });
