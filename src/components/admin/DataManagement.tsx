@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -16,12 +18,65 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Trash2, Users, BarChart3, AlertTriangle } from 'lucide-react';
+import { Trash2, Users, BarChart3, AlertTriangle, KeyRound, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const DataManagement = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [accessCode, setAccessCode] = useState('QUIZ_2025');
+
+  useQuery({
+    queryKey: ['quiz-access-code-setting'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'quiz_access_code')
+        .maybeSingle();
+
+      if (error) throw error;
+      const value = data?.value || 'QUIZ_2025';
+      setAccessCode(value);
+      return value;
+    },
+  });
+
+  const saveAccessCodeMutation = useMutation({
+    mutationFn: async (nextAccessCode: string) => {
+      const normalizedCode = nextAccessCode.trim().toUpperCase();
+
+      if (!normalizedCode) {
+        throw new Error('Access code cannot be empty');
+      }
+
+      const { error } = await (supabase as any)
+        .from('app_settings')
+        .upsert({
+          key: 'quiz_access_code',
+          value: normalizedCode,
+          updated_at: new Date().toISOString(),
+        });
+
+      if (error) throw error;
+      return normalizedCode;
+    },
+    onSuccess: (normalizedCode) => {
+      setAccessCode(normalizedCode);
+      queryClient.invalidateQueries({ queryKey: ['quiz-access-code-setting'] });
+      toast({
+        title: 'Access code saved',
+        description: `Students can now use ${normalizedCode}.`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save access code',
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Fetch active sessions for live tracking
   const { data: activeSessions = [] } = useQuery({
@@ -173,6 +228,36 @@ const DataManagement = () => {
         <AlertTriangle className="w-6 h-6 text-orange-500" />
         <h2 className="text-2xl font-bold">Data Management</h2>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="w-5 h-5 text-blue-500" />
+            Student Access Code
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="quiz-access-code">Access code</Label>
+              <Input
+                id="quiz-access-code"
+                value={accessCode}
+                onChange={(event) => setAccessCode(event.target.value.toUpperCase())}
+                placeholder="QUIZ_2025"
+              />
+            </div>
+            <Button
+              onClick={() => saveAccessCodeMutation.mutate(accessCode)}
+              disabled={saveAccessCodeMutation.isPending}
+              className="flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {saveAccessCodeMutation.isPending ? 'Saving...' : 'Save Code'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Live Tracking Data Management */}

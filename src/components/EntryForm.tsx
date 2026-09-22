@@ -16,8 +16,28 @@ const EntryForm = () => {
   const [accessCode, setAccessCode] = useState('');
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
+  const [configuredAccessCode, setConfiguredAccessCode] = useState('QUIZ_2025');
+  const [isLoadingAccessCode, setIsLoadingAccessCode] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const loadAccessCode = async () => {
+      const { data, error } = await (supabase as any)
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'quiz_access_code')
+        .maybeSingle();
+
+      if (!error && data?.value) {
+        setConfiguredAccessCode(data.value.toUpperCase());
+      }
+
+      setIsLoadingAccessCode(false);
+    };
+
+    loadAccessCode();
+  }, []);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -31,13 +51,24 @@ const EntryForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name && email && branch && accessCode) {
+      const normalizedAccessCode = accessCode.trim().toUpperCase();
+
+      if (normalizedAccessCode !== configuredAccessCode) {
+        toast({
+          title: "Invalid Access Code",
+          description: "Please check the code provided by your quiz admin.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Check if email has already been used
       try {
         const { data: existingUser, error } = await supabase
           .from('quiz_users')
           .select('has_completed, name, branch')
           .eq('email', email)
-          .eq('access_code', accessCode)
+          .eq('access_code', normalizedAccessCode)
           .maybeSingle();
 
         if (error && error.code !== 'PGRST116') {
@@ -65,7 +96,7 @@ const EntryForm = () => {
             .from('quiz_users')
             .insert([{ 
               email: email, 
-              access_code: accessCode,
+              access_code: normalizedAccessCode,
               name: name,
               branch: branch
             }]);
@@ -85,7 +116,7 @@ const EntryForm = () => {
             .from('quiz_users')
             .update({ name: name, branch: branch })
             .eq('email', email)
-            .eq('access_code', accessCode);
+            .eq('access_code', normalizedAccessCode);
 
           if (updateError) {
             console.error('Error updating user name:', updateError);
@@ -108,7 +139,7 @@ const EntryForm = () => {
   const handleStartQuiz = () => {
     setShowRulesModal(false);
     // Navigate to the quiz with name, email, branch and accessCode as search params
-    navigate(`/?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&branch=${encodeURIComponent(branch)}&accessCode=${encodeURIComponent(accessCode)}`);
+    navigate(`/?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&branch=${encodeURIComponent(branch)}&accessCode=${encodeURIComponent(accessCode.trim().toUpperCase())}`);
   };
 
   return (
@@ -230,7 +261,7 @@ const EntryForm = () => {
                     id="accessCode"
                     type="text"
                     value={accessCode}
-                    onChange={(e) => setAccessCode(e.target.value)}
+                    onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
                     placeholder="Enter your access code"
                     className="pl-10 h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     required
@@ -246,6 +277,7 @@ const EntryForm = () => {
               <Button 
                 type="submit" 
                 className="w-full h-12 bg-gray-900 hover:bg-gray-800 text-white font-medium transition-colors duration-200"
+                disabled={isLoadingAccessCode}
               >
                 Start Quiz →
               </Button>

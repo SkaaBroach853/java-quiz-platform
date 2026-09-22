@@ -256,10 +256,10 @@ const QuestionManager = ({ initialQuizId = null }: QuestionManagerProps) => {
 
   const handleSave = () => {
     const hasBlankOption = formData.options.some((option) => !option.trim());
-    if (!formData.quiz_id || !formData.question.trim() || hasBlankOption) {
+    if (!formData.question.trim() || hasBlankOption) {
       toast({
         title: 'Complete the question first',
-        description: 'Choose a quiz, enter a question, and fill in all four options.',
+        description: 'Enter a question and fill in all four options.',
         variant: 'destructive',
       });
       return;
@@ -268,6 +268,7 @@ const QuestionManager = ({ initialQuizId = null }: QuestionManagerProps) => {
       ...formData,
       question: formData.question.trim(),
       options: formData.options.map((option) => option.trim()),
+      quiz_id: formData.quiz_id || null,
     });
   };
 
@@ -308,7 +309,7 @@ const QuestionManager = ({ initialQuizId = null }: QuestionManagerProps) => {
                 onValueChange={(value) => setFormData({ ...formData, quiz_id: value })}
               >
                 <SelectTrigger id="quiz" className="mt-1">
-                  <SelectValue placeholder="Choose the quiz for this question" />
+                  <SelectValue placeholder="Optional: attach to a quiz" />
                 </SelectTrigger>
                 <SelectContent>
                   {quizzes.map((quiz) => (
@@ -317,7 +318,7 @@ const QuestionManager = ({ initialQuizId = null }: QuestionManagerProps) => {
                 </SelectContent>
               </Select>
               {quizzes.length === 0 && (
-                <p className="mt-1 text-xs text-destructive">Create a quiz before adding questions.</p>
+                <p className="mt-1 text-xs text-muted-foreground">No quiz selected. This question will be part of the main access-code quiz.</p>
               )}
             </div>
             <div>
@@ -436,7 +437,7 @@ const QuestionManager = ({ initialQuizId = null }: QuestionManagerProps) => {
             <div className="flex gap-2 pt-4">
               <Button 
                 onClick={handleSave}
-                disabled={saveMutation.isPending || quizzes.length === 0}
+                disabled={saveMutation.isPending}
               >
                 {saveMutation.isPending ? 'Saving...' : (editingQuestion ? 'Update' : 'Add')} Question
               </Button>
