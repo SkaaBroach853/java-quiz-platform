@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import QuizRulesModal from '@/components/QuizRulesModal';
-import loginBackground from '@/assets/login-background.jpg';
+import DotGrid from '@/components/DotGrid';
 
 const EntryForm = () => {
   const [name, setName] = useState('');
@@ -15,7 +15,6 @@ const EntryForm = () => {
   const [branch, setBranch] = useState('');
   const [accessCode, setAccessCode] = useState('');
   const [showRulesModal, setShowRulesModal] = useState(false);
-  const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
   const [configuredAccessCode, setConfiguredAccessCode] = useState('QUIZ_2025');
   const [isLoadingAccessCode, setIsLoadingAccessCode] = useState(true);
   const navigate = useNavigate();
@@ -37,15 +36,6 @@ const EntryForm = () => {
     };
 
     loadAccessCode();
-  }, []);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      setCursorPosition({ x: e.clientX, y: e.clientY });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -143,38 +133,26 @@ const EntryForm = () => {
   };
 
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden group"
-      style={{
-        backgroundImage: `url(${loginBackground})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
-      }}
-    >
-      {/* Background overlay that changes opacity on hover */}
-      <div className="absolute inset-0 bg-black/80 group-hover:bg-black/20 transition-all duration-700 ease-in-out" />
-      
-      {/* Cursor-following glow effect */}
-      <div 
-        className="fixed pointer-events-none z-0 opacity-60"
-        style={{
-          left: cursorPosition.x - 100,
-          top: cursorPosition.y - 100,
-          width: '200px',
-          height: '200px',
-          background: 'radial-gradient(circle, rgba(59, 130, 246, 0.4) 0%, rgba(59, 130, 246, 0.2) 30%, transparent 70%)',
-          borderRadius: '50%',
-          filter: 'blur(20px)',
-          transition: 'left 0.1s ease-out, top 0.1s ease-out'
-        }}
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-[#070510]">
+      <DotGrid
+        className="absolute inset-0 opacity-95"
+        dotSize={3}
+        gap={15}
+        baseColor="#2F293A"
+        activeColor="#5227FF"
+        proximity={110}
+        shockRadius={250}
+        shockStrength={7}
+        resistance={750}
+        returnDuration={2.1}
       />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/25 to-black/45" />
       
       {/* Content */}
       <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-blue-600 mb-2">QuizPlat</h1>
-          <p className="text-white font-medium drop-shadow-lg">
+          <h1 className="text-4xl font-bold text-white mb-2 drop-shadow-lg">QuizPlat</h1>
+          <p className="text-white font-semibold drop-shadow-lg">
             Enter your credentials to begin the assessment
           </p>
         </div>
@@ -286,10 +264,10 @@ const EntryForm = () => {
         </Card>
 
         <div className="text-center mt-8 space-y-2">
-          <p className="text-sm text-white font-medium drop-shadow-lg">
+          <p className="text-sm text-white font-bold drop-shadow-lg">
             Designed & Developed by IOTech Technical Lead
           </p>
-          <p className="text-sm text-blue-300 font-medium drop-shadow-lg">
+          <p className="text-sm text-white font-bold drop-shadow-lg">
             An Initiative by IOTech Club – Empowering Students with Technology
           </p>
         </div>

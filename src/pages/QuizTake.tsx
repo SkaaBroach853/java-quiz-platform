@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,7 @@ const QuizTake = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const answersRef = useRef<(number | null)[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCompleted, setIsCompleted] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -72,8 +73,10 @@ const QuizTake = () => {
         image_url: q.image_url || undefined,
       }));
       
+      const initialAnswers = new Array(mappedQuestions.length).fill(null);
       setQuestions(mappedQuestions);
-      setAnswers(new Array(mappedQuestions.length).fill(null));
+      setAnswers(initialAnswers);
+      answersRef.current = initialAnswers;
 
       // Create quiz session
       const { data: sessionData, error: sessionError } = await supabase
@@ -109,19 +112,13 @@ const QuizTake = () => {
   };
 
   const handleAnswer = (answerIndex: number) => {
-    const newAnswers = [...answers];
+    const newAnswers = [...answersRef.current];
     newAnswers[currentQuestionIndex] = answerIndex;
+    answersRef.current = newAnswers;
     setAnswers(newAnswers);
 
     // Save progress
     saveProgress(newAnswers);
-
-    // Move to next question or complete
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      completeQuiz(newAnswers);
-    }
   };
 
   const saveProgress = async (currentAnswers: (number | null)[]) => {
@@ -182,11 +179,19 @@ const QuizTake = () => {
   };
 
   const handleTimeUp = () => {
-    handleAnswer(-1); // Mark as unanswered
+    if (answersRef.current[currentQuestionIndex] === null) {
+      handleAnswer(-1);
+    }
+
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+      completeQuiz(answersRef.current);
+    }
   };
 
   const handleAutoSubmit = () => {
-    completeQuiz(answers);
+    completeQuiz(answersRef.current);
   };
 
   if (loading) {

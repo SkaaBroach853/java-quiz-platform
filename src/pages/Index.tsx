@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Question, QuizResult } from '@/types/quiz';
 import QuizWrapper from '@/components/QuizWrapper';
@@ -20,6 +20,7 @@ const Index = () => {
   const [questions, setQuestions] = useState<Question[] | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const answersRef = useRef<(number | null)[]>([]);
   const [isCompleted, setIsCompleted] = useState(false);
   const [result, setResult] = useState<Omit<QuizResult, 'email'> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -142,9 +143,11 @@ const Index = () => {
         const section3Questions = shuffleArray(mappedQuestions.filter(q => q.section === 3));
         
         const shuffledQuestions = [...section1Questions, ...section2Questions, ...section3Questions];
+        const initialAnswers = Array(shuffledQuestions.length).fill(null);
         
         setQuestions(shuffledQuestions);
-        setAnswers(Array(mappedQuestions.length).fill(null));
+        setAnswers(initialAnswers);
+        answersRef.current = initialAnswers;
         setQuizStartTime(Date.now());
       } catch (err) {
         console.error("Unexpected error:", err);
@@ -178,8 +181,9 @@ const Index = () => {
   }, [isCompleted, navigate]);
 
   const handleAnswer = (answerIndex: number) => {
-    const newAnswers = [...answers];
+    const newAnswers = [...answersRef.current];
     newAnswers[currentQuestionIndex] = answerIndex;
+    answersRef.current = newAnswers;
     setAnswers(newAnswers);
   };
 
@@ -191,12 +195,13 @@ const Index = () => {
     } else {
       // Quiz is complete, calculate the result
       const totalQuestions = questions.length;
+      const latestAnswers = answersRef.current;
       const correctAnswers = questions.reduce((count, question, index) => {
-        return answers[index] === question.correctAnswer ? count + 1 : count;
+        return latestAnswers[index] === question.correctAnswer ? count + 1 : count;
       }, 0);
 
       const sectionScores = questions.reduce((scores, question, index) => {
-        if (answers[index] === question.correctAnswer) {
+        if (latestAnswers[index] === question.correctAnswer) {
           scores[`section${question.section}` as keyof typeof scores] += 1;
         }
         return scores;
@@ -284,12 +289,13 @@ const Index = () => {
 
     // Auto-submit the quiz
     const totalQuestions = questions.length;
+    const latestAnswers = answersRef.current;
     const correctAnswers = questions.reduce((count, question, index) => {
-      return answers[index] === question.correctAnswer ? count + 1 : count;
+      return latestAnswers[index] === question.correctAnswer ? count + 1 : count;
     }, 0);
 
     const sectionScores = questions.reduce((scores, question, index) => {
-      if (answers[index] === question.correctAnswer) {
+      if (latestAnswers[index] === question.correctAnswer) {
         scores[`section${question.section}` as keyof typeof scores] += 1;
       }
       return scores;
