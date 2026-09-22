@@ -107,10 +107,21 @@ const DotGrid = ({
 
     const onPointerMove = (event: PointerEvent) => {
       const rect = canvas.getBoundingClientRect();
-      pointerRef.current = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      };
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      pointerRef.current = { x, y };
+
+      for (const dot of dotsRef.current) {
+        const dx = dot.cx - x;
+        const dy = dot.cy - y;
+        const distance = Math.hypot(dx, dy);
+        if (distance > proximity || distance === 0) continue;
+
+        const falloff = 1 - distance / proximity;
+        const push = falloff * 0.8;
+        dot.vx += (dx / distance) * push;
+        dot.vy += (dy / distance) * push;
+      }
     };
 
     const onClick = (event: MouseEvent) => {
@@ -136,7 +147,7 @@ const DotGrid = ({
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('click', onClick);
     };
-  }, [shockRadius, shockStrength]);
+  }, [proximity, shockRadius, shockStrength]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
